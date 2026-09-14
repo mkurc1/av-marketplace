@@ -170,6 +170,24 @@ class CompositeContract(unittest.TestCase):
         # mutation: delete "before Step 2.4 loads the decision gate" from fix-report.md Step 2.3.5
         self.assertIn("before Step 2.4 loads the decision gate", read(FIX_REPORT))
 
+    # ---- Task 7: decision gate ------------------------------------------
+
+    def test_gate_ref_clause_for_component_locations(self):
+        # mutation: delete the sentence "each component's `Location` path is pinned `:ref`" from decision-gate SKILL.md
+        self.assertIn("each component's `Location` path is pinned `:ref`", read(GATE))
+
+    def test_gate_per_component_plan_clause(self):
+        # mutation: delete "a plan for a composite carries at least one check per component" from decision-gate SKILL.md
+        self.assertIn("a plan for a composite carries at least one check per component", read(GATE))
+
+    def test_gate_fix_scope_row_dispatch_only(self):
+        # mutation: change fix.md's scope-table row back to `render-only`
+        self.assertRegex(read(GATE), r"\| `plugins/code-review/commands/fix\.md` \| dispatch-only \|")
+
+    def test_decision_analyst_knows_composites(self):
+        # mutation: delete the composite paragraph from decision-analyst.md's Input section
+        self.assertIn("composite block plus each component block", read(DECISION_ANALYST))
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)
