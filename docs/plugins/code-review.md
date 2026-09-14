@@ -2,7 +2,7 @@
 
 Security, architecture, and code quality analysis for your codebase.
 
-**Version:** 2.0.1
+**Version:** 2.1.0
 
 ## Commands
 
@@ -63,6 +63,8 @@ The fix proceeds with the pasted content directly. No report file is updated.
 
 Both modes go through the same fix cycle: parse issue, analyze context, propose fix (waits for your approval), implement, verify with linters/tests, and report results.
 
+`/fix COMP-001` fixes a composite by ID (its components travel in the payload; the composite's Remediation is the only change applied). `/fix SEC-002` on a component of an open composite first asks: fix the composite (recommended), fix the component alone, or abort.
+
 ### `/fix-report`
 
 Fix issues from saved reports. Parses one or more reports, presents unfixed issues as a paginated checklist, fixes selected issues, and marks them resolved in their source files.
@@ -83,6 +85,7 @@ The command:
 4. Presents unfixed issues as a partitioned, paginated checklist: `needs-decision` findings lead on their own page(s), ahead of every `auto`-policy page, sorted by severity within each group — no page mixes the two. Page capacity is 3 issues on any page carrying an appended skip item, and 4 only on the final page of the whole checklist. In auto-merge mode the source basename is shown in each option so review issues and QA issues are distinguishable
 5. Fixes selected issues sequentially via the `fix-auto` agent
 6. Marks fixed issues with `**Status:** ✅ Fixed (YYYY-MM-DD)` back in the file each issue came from (auto-merge may write to multiple files in one run)
+- runs the same composition pass, asks the dissolve question before the checklist, shows a composite as one checklist item, and persists selected composites after selection, before the decision gate.
 
 The reports become living documents — fixed issues won't appear on subsequent `/fix-report` runs.
 
@@ -110,13 +113,14 @@ The command:
 
 1. Resolves files — auto-merge uses newest from `docs/reviews/` and `docs/testing/reports/`; with an explicit path, uses just that file (same as `/fix-report`).
 2. Reads each file, extracts issues, and filters out those whose `**Status:**` line begins with `✅ Fixed`, `⚠️ Partially Fixed` or `🚫 Rejected` — matched by prefix, since the ` — <reason>` tail a rejected status carries would break a whole-line comparison.
-3. Applies the optional severity floor (`HIGH` keeps HIGH+CRITICAL, `MEDIUM` keeps MEDIUM+HIGH+CRITICAL, etc.).
-4. Applies the Fix-policy filter — issues flagged `needs-decision` move to a skipped list; issues without the field are treated as `auto`. **If that leaves no `auto` issues at all** — the zero-auto path, where every unfixed finding needs a decision — steps 5–8 below are skipped entirely and the command goes straight to step 9.
-5. *(auto-batch path only)* Renders a **pre-flight summary** — full issue table sorted by severity, with per-severity counts, a Source column for feedback-origin issues, and the skipped `needs-decision` findings listed under "Requires user decision".
-6. *(auto-batch path only)* Asks one yes/no question: `Proceed with fixing all N issues sequentially?`
-7. Sequentially invokes `fix-auto` on every queued issue, continuing through any individual failures.
-8. Marks each Fixed/Partially Fixed issue with `**Status:** ✅ Fixed (YYYY-MM-DD)` back in the file it came from, then displays a final summary table, which repeats the "Requires user decision" list.
-9. Offers to resolve the skipped `needs-decision` findings — a second yes/no question, then the [Decision Stage](#decision-stage) below runs the whole flow and writes its own results back. On the zero-auto path this step prints the "Requires user decision" list itself, since neither summary ran. Declining leaves those findings for a later run.
+3. Runs the composition pass (Step 1.6) over each review report: reads persisted composites, asks the `composition-analyst` for new groupings, validates them and assigns `COMP-NNN` IDs — see [Composite findings](#composite-findings).
+4. Applies the optional severity floor (`HIGH` keeps HIGH+CRITICAL, `MEDIUM` keeps MEDIUM+HIGH+CRITICAL, etc.).
+5. Applies the Fix-policy filter — issues flagged `needs-decision` move to a skipped list; issues without the field are treated as `auto`. **If that leaves no `auto` issues at all** — the zero-auto path, where every unfixed finding needs a decision — steps 5–8 below are skipped entirely and the command goes straight to step 9.
+6. *(auto-batch path only)* Renders a **pre-flight summary** — full issue table sorted by severity, with per-severity counts, a Source column for feedback-origin issues, and the skipped `needs-decision` findings listed under "Requires user decision". The pre-flight shows each composite as one row, its components under a **Composites** block, and asks the dissolve question before the confirmation gate; accepted composites are persisted at Step 3.0, after the gate. On the zero-auto path the Composites block, the dissolve question and persistence run at the head of Step 5.2, after the `yes` to the decision offer.
+7. *(auto-batch path only)* Asks one yes/no question: `Proceed with fixing all N issues sequentially?`
+8. Sequentially invokes `fix-auto` on every queued issue, continuing through any individual failures.
+9. Marks each Fixed/Partially Fixed issue with `**Status:** ✅ Fixed (YYYY-MM-DD)` back in the file it came from, then displays a final summary table, which repeats the "Requires user decision" list.
+10. Offers to resolve the skipped `needs-decision` findings — a second yes/no question, then the [Decision Stage](#decision-stage) below runs the whole flow and writes its own results back. On the zero-auto path this step prints the "Requires user decision" list itself, since neither summary ran. Declining leaves those findings for a later run.
 
 **When to use `/fix-all` vs `/fix-report`:**
 
@@ -214,6 +218,8 @@ Reports sourced from `/review` directly do not include a `Source:` field and car
 >
 > One level down, the same holds for the fixes themselves: `fix-auto` holds unrestricted `Edit`, `Write` and `Bash`, so the orchestrator's before/after observation of the tree can see a write outside the files the decision pinned but cannot stop one. Such a write is reported, not prevented — and it is named only in the run summary, which does not survive the session that printed it, so nothing about it reaches the report a later reader would find.
 
+A needs-decision composite goes through the stage as one finding: the analyst receives the composite block plus its component blocks (each feedback-origin component wrapped as untrusted data on its own), the plan carries one check per component, each prefixed with the component's ID (`SEC-002: <check> → <expected>`) — the prefix is how the orchestrator attributes a check to a component, each component's file is pinned `:ref`, and stage 4 grades the components from the plan's raw output — the fixer's Components table is advisory.
+
 ### Where the two entry points differ
 
 | | `/fix-all` Step 5 | `/fix-report` Step 2.4 |
@@ -264,6 +270,37 @@ The decision stage writes up to six additional fields into a finding block, alon
 | `**Decision-pin:**` | Alongside `**Decision:**` | A content hash of the finding block plus one hash per file the resolution touches, so an edit to those files between decision and dispatch is detected |
 | `**Dispatch:**` | Immediately before each `fix-auto` call | `attempt <N> dispatched <date>` — distinguishes "decided, never dispatched" from "dispatched, outcome unknown" on a resumed run |
 | `**Verification:**` | Alongside the status line (or the attempt entry, where none is written) | `hard`/`advisory`/`unavailable` — `<checks run>[; <N> not run: <check text>]` — how the status was actually verified, since a run summary does not survive the session that printed it |
+
+## Composite findings
+
+Several findings often share one cause: five "missing validation in endpoint X" findings that are really one missing validation layer. Since 2.1.0 the plugin recognises such groups as **composites** and fixes each as one unit — the composite's Remediation is applied once, and the fixer reports per component whether the symptom is gone, instead of patching the symptoms one by one.
+
+**Format.** A composite is an ordinary finding block with `**Category:** Composite`, prefix `COMP`, living in `docs/reviews/`:
+
+```markdown
+### [HIGH] COMP-001: Missing input validation layer
+
+**ID:** COMP-001
+**Location:** `src/api/validation.py:1`
+**Category:** Composite
+**Composed-of:** SEC-002, SEC-003, ARCH-001
+**Origin:** review
+**Effort:** medium
+
+**Problem:** the shared cause
+**Impact:** what the combination costs
+**Remediation:** the single change that resolves every component
+```
+
+Each component carries `**Part-of:** COMP-001` after its `**ID:**` line. `**Composed-of:**` is the source of truth for membership (two to twelve IDs from the same report, on one physical line); `Part-of` is a derived back-reference. A composite's severity is never below its components' maximum; composites never nest; a component belongs to at most one open composite. `**Fix-policy:** needs-decision` is inherited when any component carries a non-`auto` policy.
+
+**Where composites come from.** `/review` renders the cross-verifier's composite findings as `COMP` blocks — only where one change resolves every basis, bases kept disjoint, `COMP` IDs assigned last so `Composed-of` carries final IDs. `/fix-all` and `/fix-report` additionally run a **composition pass** (Step 1.6) before their pre-flight: a read-only `composition-analyst` agent reads the unfixed, ungrouped findings of each review report and proposes groups that share one cause and one fix, with a citation per member and a self-falsification battery; the command re-validates every proposal (membership, size, disjointness, a usable and contained `Location`) and assigns the next `COMP-NNN`. A composite whose `Composed-of` names an ID with no block in the report is malformed: the pass sets it aside, lists it as `malformed-composite`, fixes its present components individually, and leaves it open until repaired or dissolved. QA reports are never grouped, and `/qa:loop` is untouched.
+
+**The dissolve question — the one human gate on a grouping.** Before the confirmation gate (`/fix-all`) or before the checklist (`/fix-report`), one multi-select question lists every composite the run holds, proposed and persisted alike, four per page, with its Problem and Remediation on screen: dissolve a proposal and its components are fixed individually and nothing is written; dissolve a persisted composite and its block gets `🚫 Rejected (date) — dissolved into components`, releasing its components. If the question cannot be asked, every composite is dissolved for the run — silence is never read as consent. Accepted composites are persisted into the report (`Origin: fix-time`, `Part-of` on each component) only after the run has committed to dispatching, so an aborted run writes nothing.
+
+**Fixing.** A composite is one `fix-auto` call whose payload is the composite block followed by every component block; the fixer applies the composite's Remediation and nothing else, never a component's own Remediation, and returns a `**Components:**` table of `resolved` / `unresolved` / `unresolved (no location)` / `skipped (fixed)` / `skipped (rejected)`. The verdict is computed over the components actually checked; a composite none of whose components could be checked is Failed, disclosed as `no component checked`. The composite's status and each `resolved` component's `✅ Fixed` are written back by the usual recipe. On the auto path those component statuses rest on the fixer's own re-read and are labelled `advisory (fixer self-report)` in the Fix Summary; on the decision-gate path each component is graded by the orchestrator on that component's own check in the decided verification plan. A needs-decision composite goes through the [Decision Stage](#decision-stage) as **one** finding. `/fix COMP-001` fixes a composite by ID through `/fix`'s own phases; `/fix SEC-002` on a bound component asks whether to fix the composite instead, the component alone, or abort.
+
+**Re-runs.** Markers are on disk before the first dispatch, so an interrupted run leaves its successor the same composites. A `Partially Fixed` composite releases its unresolved components, which return individually; a `Failed` composite returns whole and can be dissolved. A component fixed alone leaves the composite open until fewer than two components remain, when the composite is degenerate and its lone component is fixed as an ordinary finding.
 
 ## What It Analyzes
 
@@ -404,6 +441,8 @@ scripts themselves are the canonical implementation.
 
 <a id="upgrade-notes"></a>
 ## Upgrade Notes
+
+**`code-review` 2.1.0 changes how a pre-existing review report is dispatched, not how it is parsed.** Every new field (`**Composed-of:**`, `**Part-of:**`, `**Origin:**`, `**Category:** Composite`) is additive: the `### [SEVERITY]` block extraction, `fix-auto`'s field table, `extract-issue-ids.sh` and the `**Status:**` grammar all read an old report unchanged. Their dispatch does change: the fix-time composition pass may group an old review or feedback report's unfixed findings, persist `Composed-of`/`Part-of`/`Origin` markers into the file and dispatch a group as one `fix-auto` call. The dissolve question is the per-run veto, no write happens before the run's commitment point (the confirmation gate, or the `yes` to the decision offer on `/fix-all`'s zero-auto path), and the pass is fail-safe — an unavailable analyst means no grouping, never a blocked run. A reader older than 2.1.0 ignores the new fields and dispatches a `COMP` block like any finding, applying its Remediation without the component checks; pair versions when a report carries composites.
 
 **`code-review` 2.0.0 requires every reader to be ≥ 2.0.0 too — this is a requirement, not a recommendation.** A report carrying a `🚫 Rejected` status, or a `**Location:**` line in the extended `(was: …)` form, is a committed artifact, and nothing on the writing side stops an older reader from opening it. This is the worse of the two version skews this release introduces, because the failure is silent and the outcome is terminal:
 
