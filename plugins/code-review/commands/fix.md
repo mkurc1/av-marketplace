@@ -9,8 +9,8 @@ argument-hint: <issue-id|full issue block from /review report>
 
 Parse the input argument to determine mode:
 
-- **ID Mode:** If `$ARGUMENTS` matches pattern `^(SEC|PERF|ARCH|MAINT|DOC|QA)-\d{3}$`
-  - Examples: `SEC-001`, `PERF-042`, `ARCH-001`, `MAINT-999`, `DOC-001`, `QA-001`
+- **ID Mode:** If `$ARGUMENTS` matches pattern `^(SEC|PERF|ARCH|MAINT|DOC|QA|COMP)-\d{3}$`
+  - Examples: `SEC-001`, `PERF-042`, `ARCH-001`, `MAINT-999`, `DOC-001`, `QA-001`, `COMP-001`
   - Action: Proceed to Phase 0 (Resolve Issue by ID)
 
 - **Legacy Paste Mode:** If `$ARGUMENTS` does not match the ID pattern (e.g., contains `### [` or other issue block content)

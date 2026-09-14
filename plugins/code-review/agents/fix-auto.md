@@ -40,7 +40,7 @@ Extract the following fields from the issue block:
 | Severity | `[CRITICAL\|HIGH\|MEDIUM\|LOW]` in title | Yes |
 | Title | Text after severity in first line | Yes |
 | Location | `**Location:** \`path:line\`` (plain form) or `**Location:** \`path:line\` (was: \`original\`)` (extended form, written when a location is corrected) — take the first backticked token as the location, ignoring any trailing parenthetical; if the line carries no backticked token at all, take the first whitespace-delimited token after the field name instead. Under either clause, `—`, `unknown:0`, or anything that does not parse as `path:line` or `path:line-range` is location-less. | Yes |
-| Category | `**Category:** Security\|Performance\|Architecture\|Maintainability\|Documentation\|Testing` | Yes |
+| Category | `**Category:** Security\|Performance\|Architecture\|Maintainability\|Documentation\|Testing\|Composite` | Yes |
 | OWASP | `**OWASP:** A##:####` | No |
 | CWE | `**CWE:** CWE-###` | No |
 | Effort | `**Effort:** trivial\|easy\|medium\|hard` | No |

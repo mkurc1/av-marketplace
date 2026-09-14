@@ -33,6 +33,7 @@ The review launches parallel analysis agents (security + code quality, and optio
 | Architecture    | ARCH   | `docs/reviews/`         |
 | Maintainability | MAINT  | `docs/reviews/`         |
 | Documentation   | DOC    | `docs/reviews/`         |
+| Composite       | COMP   | `docs/reviews/`         |
 | Testing         | QA     | `docs/testing/reports/` |
 
 The `Testing → QA` row covers issues produced by the `qa` plugin's `/qa:run` command. Reports for QA issues live under `docs/testing/reports/`; `/fix QA-001` and `/fix-report` (auto-merge) handle them transparently.
