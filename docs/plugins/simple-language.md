@@ -29,6 +29,7 @@ The hook runs every time a session starts, resumes, is cleared, or is compacted.
 - Sentences up to ~15 words, one idea each.
 - No definitions in parentheses. A definition is its own sentence.
 - Technical terms are defined at first use.
+- One name per thing, repeated every time. No synonyms for variety.
 
 **Documents written by the agent**
 

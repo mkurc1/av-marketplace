@@ -41,6 +41,7 @@ A reply longer than one screen gets `##` headings. One topic per heading.
 
 ## Words
 
+- **One name per thing, every time.** Once you have named something, repeat that name. Do not swap in synonyms for variety. This is not literary prose. Varied wording reads as a second thing.
 - **No team slang.** Do not coin words or mix languages: "the ancestor bump", "kicks the flow". Say what happens: "updates `updated_at` on the parent rows", "starts the workflow".
 - **No undefined jargon.** If a technical term is necessary, define it in one sentence at first use. Then use only that one term.
 - **The code name, not a shorthand.** A field or method name in backticks is unambiguous. "The ancestor bump" is not.
@@ -99,6 +100,7 @@ Before sending, scan for these. Any hit: rewrite.
 - An em dash or a semicolon joining two clauses in a list item
 - A paragraph longer than 3 sentences
 - A technical term not defined at first use
+- The same thing called by two different words
 - A closing offer of more help
 
 ## When Not To Apply
