@@ -273,7 +273,7 @@ For each issue in that batch, **sequentially** (one at a time, wait for completi
    - **Partially Fixed** — subagent report says "Partially Fixed"
    - **Failed** — subagent report says "Failed" or subagent errored
 
-   For a composite, read the fixer's `**Components:**` table and map statuses exactly as `/fix-all` Step 3.1 does (a missing or unparseable table is Failed with nothing written; the auto path's component statuses are advisory; on the decided partition stage 4's graded case and the per-component plan checks decide instead).
+   For a composite, read the fixer's `**Components:**` table and map statuses exactly as `/fix-all` Step 3.1 does (a missing or unparseable table is Failed with nothing written; the auto partition's component statuses are advisory; on the decided partition stage 4's graded case and the per-component plan checks decide instead, as `/fix-all` Step 5.5 states).
 
 3. Store the status for this issue
 
@@ -316,7 +316,7 @@ Use the Edit tool to insert each status line. The `old_string` should be the `##
 - **The `**Status:**` line and the `**Verification:**` line are written in the same write.** The `**Verification:**` value records how the verification was obtained; a status written without it cannot be told apart from a hard-verified one once the session ends.
 - **For the two stage-4 cases that write no `**Status:**` line, the write instead appends the attempt entry** to the finding's `**Decision:**` line, carrying that same `**Verification:**` line with it. That append is what keeps the two-attempt retirement counter advancing and the escape to `reject` reachable.
 
-Both lines go into the finding's `source_file`, below the `**Status:**` slot, on one physical line each. The `auto` findings of the batch are unaffected: they carry no decision record and keep the plain status write above.
+Both lines go into the finding's `source_file`, below the `**Status:**` slot, on one physical line each. The `auto` findings of the batch are unaffected, with one exception: they carry no decision record and keep the plain status write above, except a composite and its `resolved` components fixed on the auto partition, whose `**Status:**` lines are written together with a `**Verification:** advisory — <checks run>` line (the Composites paragraph above).
 
 ### Step 4.1.5: Verify Status writes
 
@@ -347,7 +347,7 @@ The append has not landed if the bracketed field still ends with the entry it ca
 
 This is the one check whose absence is not merely cosmetic. The attempt entry is what advances the two-attempt retirement counter; a lost append freezes it, and a decision that fails every run then replays forever with the escape to `reject` unreachable behind it — precisely the failure retirement exists to prevent. A status line that fails to land costs an annotation; an attempt entry that fails to land costs the loop its exit.
 
-**The `**Verification:**` line, checked for every decided finding of the batch.** Both writes carry it: `code-review:decision-gate`'s *Stage 4* writes the `**Verification:**` line **in the same write as the `**Status:**` line**, and, for the two cases that write no status, **in the write that appends the attempt entry**. So every graded finding of the decided partition acquires one, whichever case it fell into, and this check runs over that whole partition rather than over one group of it. The selected `auto` findings carry no decision record and no `**Verification:**` line, exactly as Step 4.1 says, and are outside this check.
+**The `**Verification:**` line, checked for every decided finding of the batch.** Both writes carry it: `code-review:decision-gate`'s *Stage 4* writes the `**Verification:**` line **in the same write as the `**Status:**` line**, and, for the two cases that write no status, **in the write that appends the attempt entry**. So every graded finding of the decided partition acquires one, whichever case it fell into, and this check runs over that whole partition rather than over one group of it. The selected `auto` findings carry no decision record and, with one exception, no `**Verification:**` line, so they are outside this check. The exception is a composite and its `resolved` components fixed on the auto partition: Step 4.1 writes each of their `**Status:**` lines together with a `**Verification:** advisory — <checks run>` line, and for those blocks this check runs too, exactly as below — the value is `advisory`, since it records the fixer's own re-read rather than an orchestrator-run check.
 
 For each decided finding of the batch, the verification is:
 
