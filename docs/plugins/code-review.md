@@ -51,7 +51,7 @@ Apply a fix for a single issue from a review report. Supports two modes:
 /fix QA-001
 ```
 
-The plugin routes by prefix: `QA-NNN` reads from `docs/testing/reports/`, all other prefixes (`SEC`, `PERF`, `ARCH`, `MAINT`, `DOC`) read from `docs/reviews/`. It picks the newest `.md` in the chosen directory, locates the issue by ID, and proceeds with the fix. After fixing, the issue is marked as fixed in the report.
+The plugin routes by prefix: `QA-NNN` reads from `docs/testing/reports/`, all other prefixes (`SEC`, `PERF`, `ARCH`, `MAINT`, `DOC`, `COMP`) read from `docs/reviews/`. It picks the newest `.md` in the chosen directory, locates the issue by ID, and proceeds with the fix. After fixing, the issue is marked as fixed in the report.
 
 **Paste mode** — paste the full issue block:
 
@@ -85,6 +85,7 @@ The command:
 4. Presents unfixed issues as a partitioned, paginated checklist: `needs-decision` findings lead on their own page(s), ahead of every `auto`-policy page, sorted by severity within each group — no page mixes the two. Page capacity is 3 issues on any page carrying an appended skip item, and 4 only on the final page of the whole checklist. In auto-merge mode the source basename is shown in each option so review issues and QA issues are distinguishable
 5. Fixes selected issues sequentially via the `fix-auto` agent
 6. Marks fixed issues with `**Status:** ✅ Fixed (YYYY-MM-DD)` back in the file each issue came from (auto-merge may write to multiple files in one run)
+
 - runs the same composition pass, asks the dissolve question before the checklist, shows a composite as one checklist item, and persists selected composites after selection, before the decision gate.
 
 The reports become living documents — fixed issues won't appear on subsequent `/fix-report` runs.
@@ -115,8 +116,8 @@ The command:
 2. Reads each file, extracts issues, and filters out those whose `**Status:**` line begins with `✅ Fixed`, `⚠️ Partially Fixed` or `🚫 Rejected` — matched by prefix, since the ` — <reason>` tail a rejected status carries would break a whole-line comparison.
 3. Runs the composition pass (Step 1.6) over each review report: reads persisted composites, asks the `composition-analyst` for new groupings, validates them and assigns `COMP-NNN` IDs — see [Composite findings](#composite-findings).
 4. Applies the optional severity floor (`HIGH` keeps HIGH+CRITICAL, `MEDIUM` keeps MEDIUM+HIGH+CRITICAL, etc.).
-5. Applies the Fix-policy filter — issues flagged `needs-decision` move to a skipped list; issues without the field are treated as `auto`. **If that leaves no `auto` issues at all** — the zero-auto path, where every unfixed finding needs a decision — steps 5–8 below are skipped entirely and the command goes straight to step 9.
-6. *(auto-batch path only)* Renders a **pre-flight summary** — full issue table sorted by severity, with per-severity counts, a Source column for feedback-origin issues, and the skipped `needs-decision` findings listed under "Requires user decision". The pre-flight shows each composite as one row, its components under a **Composites** block, and asks the dissolve question before the confirmation gate; accepted composites are persisted at Step 3.0, after the gate. On the zero-auto path the Composites block, the dissolve question and persistence run at the head of Step 5.2, after the `yes` to the decision offer.
+5. Applies the Fix-policy filter — issues flagged `needs-decision` move to a skipped list; issues without the field are treated as `auto`. **If that leaves no `auto` issues at all** — the zero-auto path, where every unfixed finding needs a decision — steps 6–9 below are skipped entirely and the command goes straight to step 10.
+6. *(auto-batch path only)* Renders a **pre-flight summary** — full issue table sorted by severity, with per-severity counts, a Source column for feedback-origin issues, and the skipped `needs-decision` findings listed under "Requires user decision". The pre-flight shows each composite as one row, its components under a **Composites** block, and asks the dissolve question before the confirmation gate; accepted composites are persisted at Step 3.0, after the gate. On the zero-auto path the Composites block and the dissolve question run at the head of Step 5.2, before the decision offer; persistence runs after the `yes` to that offer, before the decision gate is loaded.
 7. *(auto-batch path only)* Asks one yes/no question: `Proceed with fixing all N issues sequentially?`
 8. Sequentially invokes `fix-auto` on every queued issue, continuing through any individual failures.
 9. Marks each Fixed/Partially Fixed issue with `**Status:** ✅ Fixed (YYYY-MM-DD)` back in the file it came from, then displays a final summary table, which repeats the "Requires user decision" list.
