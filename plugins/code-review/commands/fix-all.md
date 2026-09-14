@@ -187,11 +187,11 @@ Follow the [Abort helper](#abort-helper) procedure.
 
 ### Step 1.6: Composition pass
 
-Runs over every unfixed issue from Step 1.3, `auto` and `needs-decision` alike, **per source file, and only for review reports** (`docs/reviews/`, feedback reports included). A QA report under `docs/testing/reports/` is never grouped: the `COMP` prefix routes to `docs/reviews/`, so a composite written anywhere else would be unreachable by ID. Vocabulary, from the composite findings design: a **composite** is a block of `**Category:** Composite` with a `**Composed-of:**` list of at least two component IDs from the same file; it is **open** while it carries no `**Status:**` line; it is **degenerate** when fewer than two of its components are unfixed; it is **dispatchable** when open and not degenerate. `**Composed-of:**` is the source of truth for membership — a component's `**Part-of:**` line is a derived back-reference and a missing or dangling one changes nothing.
+Runs over every unfixed issue from Step 1.3, `auto` and `needs-decision` alike, **per source file, and only for review reports** (`docs/reviews/`, feedback reports included). A QA report under `docs/testing/reports/` is never grouped: the `COMP` prefix routes to `docs/reviews/`, so a composite written anywhere else would be unreachable by ID. Vocabulary: a **composite** is a block of `**Category:** Composite` with a `**Composed-of:**` list of at least two component IDs from the same file; it is **open** while it carries no `**Status:**` line; it is **degenerate** when fewer than two of its components are unfixed; it is **malformed** when any ID in `Composed-of` has no block in the file (rule 1 below); it is **dispatchable** when open, not degenerate and not malformed. `**Composed-of:**` is the source of truth for membership — a component's `**Part-of:**` line is a derived back-reference and a missing or dangling one changes nothing.
 
 **1.6.1 Marker resolution.** For each review file:
 
-1. For each open composite block, its components are the IDs in `Composed-of` that exist in the same file and are unfixed. Those components leave the individual list — they are **bound**. A composite's effective severity for the run is the greater of its block's severity and its components' maximum, so a hand-edited block below a component's severity never lets Step 2.2's floor drop the composite while a component stays bound; the report is not rewritten. An ID in `Composed-of` with no block in the file — a typo, a deleted finding, or a `COMP-` ID, since composites never nest — makes the composite **malformed**: it is not dispatched as a unit, its present unfixed components are unbound for this run (dispatched individually, still not candidates for grouping), the composite stays open for the user to repair or dissolve by hand (it is not dispatchable, so the dissolve question never offers it), and Step 4.2's Composition block lists it as `malformed-composite`. A block with `**Category:** Composite` and no `**Composed-of:**` line, or fewer than two IDs on it, is not a composite and not a candidate: exclude it from this pass and from dispatch and list it in Step 4.2's Composition block as `malformed-composite`.
+1. For each open composite block, its components are the IDs in `Composed-of` that exist in the same file and are unfixed. Those components leave the individual list — they are **bound**. A component whose `Location` is not usable under *The usability rule* in `code-review:decision-gate` **in full** — it parses by the two-clause read rule, is contained in the repository tree by that section's three-step containment test, and exists there — is **unbound for the run** rather than bound: the fixer opens every bound component's site, and an unusable one is not made safe by the composite's own contained `Location`. It re-enters the individual list, where its path and its `Source` handle are on the pre-flight table for the user to see; it is still not a candidate for grouping (rule 3); and Step 4.2's Composition block lists it as `member-location-unusable`. Rule 2 then counts what is left, so unbinding can leave the composite degenerate. A composite's effective severity for the run is the greater of its block's severity and its components' maximum, so a hand-edited block below a component's severity never lets Step 2.2's floor drop the composite while a component stays bound; the report is not rewritten. An ID in `Composed-of` with no block in the file — a typo, a deleted finding, or a `COMP-` ID, since composites never nest — makes the composite **malformed**: it is not dispatched as a unit, its present unfixed components are unbound for this run (dispatched individually, still not candidates for grouping), the composite stays open for the user to repair or dissolve by hand (it is not dispatchable, so the dissolve question never offers it), and Step 4.2's Composition block lists it as `malformed-composite`. A block with `**Category:** Composite` and no `**Composed-of:**` line, or fewer than two IDs on it, is not a composite and not a candidate: exclude it from this pass and from dispatch and list it in Step 4.2's Composition block as `malformed-composite`.
 2. A composite with fewer than two unfixed components is **degenerate**: it is not dispatched and is neither queued nor listed under Composites. With one remaining component, that component re-enters the individual list — it passes the severity floor and the Fix-policy partition, appears as an ordinary pre-flight row and counts in `total_count` — but it is still **not** a candidate for grouping (rule 3); at write-back the composite receives the same status that component receives. With none, the composite is closed at write-back (Step 4.1).
 3. The file's **candidate set** is every unfixed, non-composite issue that is named in no open composite's `Composed-of` and carries no `**Decision:**` or `**Dispatch:**` line.
 
@@ -204,6 +204,7 @@ Runs over every unfixed issue from Step 1.3, `auto` and `needs-decision` alike, 
 - no member appears in another accepted proposal;
 - `Severity` is recomputed as the members' maximum, overwriting the agent's value if it differs;
 - `Location` is usable under *The usability rule* in `code-review:decision-gate` **in full** — it parses by the two-clause read rule, is contained in the repository tree by that section's three-step containment test, and exists there; a proposal whose `Location` fails any conjunct is dropped and listed with `location-unusable`, never repaired;
+- every member's `Location` is usable under that same rule **in full**, since the fixer opens each member's site and not the composite's alone; a proposal with a member whose `Location` fails any conjunct is dropped and listed with `member-location-unusable`, never repaired;
 - `**Fix-policy:** needs-decision` is inherited when any member carries a `**Fix-policy:**` value other than `auto` (an unparseable value counts, as in Step 2.2.5).
 
 A proposal failing any check is dropped and listed in Step 4.2's Composition block with the failing check. A response missing the closing line `Composition: <N> groups proposed over <M> findings`, or unparseable, makes the pass **unavailable** for that file. The analyst's `## Rejected groupings` lines are kept for the Composition block.
@@ -279,7 +280,7 @@ Compute:
 - `severity_counts` = map of CRITICAL/HIGH/MEDIUM/LOW → count (use `—` instead of `0` in the rendered table)
 - `report_basenames` = comma-separated basenames of the distinct `source_file` values
 - `show_report_column` = true if `files` from Step 1.1 has >1 distinct path
-- `show_source_column` = true if at least one issue in the list has `source_handle` set
+- `show_source_column` = true if at least one issue in the list has `source_handle` set, counting the bound components of every dispatchable composite, which the list itself holds as one issue
 
 Render to stdout (Markdown):
 
@@ -311,24 +312,29 @@ Render to stdout (Markdown):
 - COMP-001 (review) — Missing input validation layer — components: SEC-002, SEC-003, ARCH-001
   Problem: <the composite's Problem>
   Remediation: <the composite's Remediation>
+  - SEC-002 — src/api/users.py:31 — @reviewer
+  - SEC-003 — src/api/orders.py:88 — —
+  - ARCH-001 — src/api/validation.py:1 — —
 - COMP-002 (fix-time, proposed) — Unbounded queue growth — components: PERF-001, PERF-003
   Problem: <…>
   Remediation: <…>
+  - PERF-001 — src/queue/worker.py:44 — —
+  - PERF-003 — src/queue/buffer.py:12 — —
 
 **Composition pass:** 1 proposed this run, 1 already in the report
 ```
 
-`proposed this run` counts the pass's accepted proposals — none of which is persisted at this point — and `already in the report` counts the open composite blocks the file carries, whatever their `Origin`. The line reads `unavailable — <reason>` where Step 1.6.5 applied. Where Step 2.4.5's fail-closed path applied, a second line follows: `Dissolve question: unavailable — <reason>; all composites dissolved for this run`. The `Problem` and `Remediation` lines go one step beyond §6.6's minimum, deliberately: the dissolve question is the one human gate on a grouping, and with them on screen the user vetoes the change itself, not a list of IDs.
+`proposed this run` counts the pass's accepted proposals — none of which is persisted at this point — and `already in the report` counts the open composite blocks the file carries, whatever their `Origin`. The line reads `unavailable — <reason>` where Step 1.6.5 applied. Where Step 2.4.5's fail-closed path applied, a second line follows: `Dissolve question: unavailable — <reason>; all composites dissolved for this run`. The `Problem` and `Remediation` lines go one step beyond the minimum ID list, deliberately: the dissolve question is the one human gate on a grouping, and with them on screen the user vetoes the change itself, not a list of IDs. Each bound component is listed under its composite as `- ID — path:line — @handle`, its `Location` read by the same two-clause rule the table uses and `—` where that rule reads it as location-less or the block carries no `**Source:**` line. Those components have no row of their own, so this is the only place the user sees the path a fixer will open and the handle it came from before answering the dissolve question.
 
 Rendering rules:
 
 - Omit the `Severity floor:` line entirely if `severity_floor` is unset.
-- Omit the `Source` column entirely if `show_source_column` is false (no issue has a `Source:` field). When present, the cell is `@handle` for feedback-origin issues and `—` for others.
+- Omit the `Source` column entirely if `show_source_column` is false (no issue has a `Source:` field). When present, the cell is `@handle` for feedback-origin issues and `—` for others. A composite's cell carries the `@handle` of every feedback-origin block among the composite and its bound components, comma-separated, and `—` where none of them carries one — provenance the table would otherwise drop, since those components have no row.
 - Omit the `Report` column entirely if `show_report_column` is false (single-file mode or auto-merge resolved to one file).
 - Truncate titles longer than 60 characters to 60 chars + `…`.
 - **Always render the full list** — no "and N more" truncation.
 - `Location` is read from the issue's `**Location:**` field by the **two-clause read rule** in `code-review:decision-gate` (*The usability rule*), which is that rule's single source of truth and is not restated here. Render the location the rule yields — the first backticked token, never the whole field value with its `(was: …)` tail — and `—` where the field is missing or the rule reads it as location-less. Containment, which that same section adds as a further conjunct of *usability*, is stage 0's gate for whether to ask a human and is not applied here: this table renders, it does not validate.
-- A composite (proposed or persisted) is one row: `COMP-001`, its severity, title, location. Bound components of a dispatchable composite do **not** appear in the table, and `total_count` counts a composite as one issue and excludes its bound components.
+- A composite (proposed or persisted) is one row: `COMP-001`, its severity, title, location. Bound components of a dispatchable composite do **not** appear in the table — the Composites block lists each of them instead — and `total_count` counts a composite as one issue and excludes its bound components. A component Step 1.6.1 unbound as `member-location-unusable` is not bound, so it keeps an ordinary row of its own.
 
 ### Step 2.4.5: The dissolve question
 
@@ -582,7 +588,7 @@ Step 4 finished everything the report said could be fixed without you. This step
 2. Print the "Requires user decision" list yourself, in the rendering Step 4.2 gives it — `- [SEVERITY] ID: Title — Drift-class: <class>`, with `—` where the `**Drift-class:**` field is missing. Step 4.2 never ran on this path, so without this the offer would be a question about findings you were never shown.
 3. **Run the composite gate here.** Step 2.4.5 and Step 3.0 were skipped with the rest of Step 2 and Steps 3–4, but Step 1.6 ran and its proposals exist, every one of them needs-decision. Print Step 2.4's Composites block, ask Step 2.4.5's dissolve question (fail-closed as there), and — only once the user answers **yes** to the offer below — run Step 3.0's persistence writes before `code-review:decision-gate` is loaded at Step 5.4, so the gate's pins are computed over blocks that already carry the markers. A **no** writes nothing. The run's commitment point on this path is that `yes`. A component released by a dissolution here has no fix list to join: Steps 3–4 were skipped. One that partitions to `auto` is not dispatched this run, and its delta line renders it as `left for the next bulk run` rather than `joins the fix list`; one that partitions to needs-decision joins the `needs_decision` list, and the offer's `<N>` and batch count are recomputed before it is asked.
 
-**On the normal path** both are already done — Step 4.2 printed that list and closed task 4 — so only mark task 5 as `in_progress` using TaskUpdate.
+**On the normal path** all three are already done — Step 4.2 printed that list and closed task 4, and Steps 2.4.5 and 3.0 ran the composite gate — so only mark task 5 as `in_progress` using TaskUpdate.
 
 Then ask, with AskUserQuestion, one question. `N` is the length of `needs_decision`; `B` is `⌈N / 8⌉`, the batch shape stage 1 of the gate will fan out in:
 

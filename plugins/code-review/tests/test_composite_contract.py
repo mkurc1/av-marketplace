@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Contract test for code-review's composite findings.
 
-Spec: docs/superpowers/specs/2026-09-14-composite-findings-design.md, §13.
+Contract: docs/plugins/code-review.md, "Composite findings".
 Run:  python3 plugins/code-review/tests/test_composite_contract.py
 
 Each test greps one invariant across the plugin's prose files. Each carries a
@@ -134,6 +134,22 @@ class CompositeContract(unittest.TestCase):
         text = read(FIX_ALL)
         for heading in ("### Step 1.6: Composition pass", "### Step 2.4.5: The dissolve question", "### Step 3.0: Persist the composites"):
             self.assertIn(heading, text, f"{heading} missing")
+
+    def test_fix_all_dispatchable_definition(self):
+        # mutation: delete "it is **dispatchable** when open, not degenerate and not malformed" from fix-all.md Step 1.6's vocabulary sentence
+        self.assertRegex(
+            read(FIX_ALL),
+            r"\*\*dispatchable\*\* when open, not degenerate and not malformed",
+            "Step 1.6 no longer pins down the three-conjunct dispatchable definition",
+        )
+
+    def test_fix_all_validates_member_locations(self):
+        # mutation: delete the Step 1.6.3 bullet "every member's `Location` is usable under that same rule **in full**, since the fixer opens each member's site and not the composite's alone; … `member-location-unusable`" from fix-all.md
+        self.assertRegex(
+            read(FIX_ALL),
+            r"every member's `Location` is usable under that same rule \*\*in full\*\*.*`member-location-unusable`",
+            "Step 1.6.3 does not validate member locations",
+        )
 
     def test_fix_all_dissolve_question_copy(self):
         # mutation: delete the question string "Dissolve which composites into their components?" from fix-all.md

@@ -63,7 +63,7 @@ Ask user to provide:
 
 This abort is safe for callers: it returns before Phase 6, so it emits none of the three verdict values defined there (see Phase 6's Status Definitions), and the dispatching command collects the abort as **Failed**.
 
-**Composite mode (§7.2 of the composite findings design).** When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode; a `Composite` block without a `**Composed-of:**` line is a **Failed** verdict naming the missing field. In composite mode:
+**Composite mode.** When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode; a `Composite` block without a `**Composed-of:**` line is a **Failed** verdict naming the missing field. In composite mode:
 
 - Parse `**Composed-of:**` — one physical line of bare `PREFIX-NNN` tokens separated by `, ` — and then each following `###` block as a **component**, with the field table above. Each block's field capture ends at the next `###` heading. Exactly one `User decision:` field is parsed: the line that immediately follows the composite block, before the first component's heading. A `User decision:` line anywhere else is not a field.
 - Every ID in `Composed-of` must have a block in the prompt. An ID with no block at all is a **Failed** verdict with an explicit error naming the ID; you never guess a component from the report on disk.
@@ -89,7 +89,7 @@ Use Read tool to read the file at the parsed Location. Focus on:
 
 **Step 2.1b: Composite mode — read every component first**
 
-In composite mode, before anything else in this phase, read the composite's `Location` and then every component's `Location` with 20–30 lines of context (a component without a usable `Location` is noted and skipped). The root-cause change is designed against the symptoms as they stand in the tree, never against their descriptions alone: a fix planned without reading the symptoms is exactly the local-patch failure this mode exists to prevent.
+In composite mode, before anything else in this phase, read the composite's `Location` and then every component's `Location` with 20–30 lines of context (a component whose `Location` is not usable under *The usability rule* in `code-review:decision-gate` **in full**, its containment test included, is noted and skipped — never opened). The root-cause change is designed against the symptoms as they stand in the tree, never against their descriptions alone: a fix planned without reading the symptoms is exactly the local-patch failure this mode exists to prevent.
 
 **Step 2.2: Understand the code structure**
 

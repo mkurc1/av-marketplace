@@ -9,7 +9,7 @@ description: "Use when authoring or reviewing any code-review reporting agent, o
 
 A reported finding is a claim. This skill makes every claim survive an attempt to refute it *by its own author* before it reaches the report. The battery runs per finding; the disposition rules make rejected work visible instead of silently discarded — a reader who cannot see what was rejected cannot calibrate trust in what was accepted.
 
-Invoke when authoring or reviewing a code-review reporting agent, and at report time inside the wired agents (security-auditor, code-quality-auditor, documentation-auditor, challenger) before findings are returned.
+Invoke when authoring or reviewing a code-review reporting agent, and at report time inside the wired agents (security-auditor, code-quality-auditor, documentation-auditor, challenger) before findings are returned, and inside composition-analyst before composition proposals are returned (partial — see Scope and exemptions).
 
 ## The refutation battery (MUST, per finding)
 
@@ -36,6 +36,7 @@ Applies to code-review's four wired reporting agents. Recorded exemptions:
 - **cross-verifier** — its composite findings derive from already-vetted findings and cite their basis IDs; a second battery would double-verify.
 - **feedback-analyzer** — follows `/analyze-feedback`'s own validity contract.
 - **challenger** *(partial)* — runs the battery on its own verdicts but emits no Rejected/Doctrine-gap sections: a self-rejected false-positive or downgrade call resolves back to `confirmed` in its Challenge Results, so the reversal is visible in the disposition itself.
+- **composition-analyst** *(partial)* — runs the battery adapted to grouping over every proposal (its five checks), but emits only `## Rejected groupings`: its fixed-label return contract admits no section after the closing line, and a grouping proposal has no doctrine-gap analog.
 
 ## Relationship to the challenger, and the contract boundary
 

@@ -283,7 +283,7 @@ challenger_results = TaskOutput(challenger_id, block: true)
    1. Resolve each basis by exact title (or `DOC-NNN` ID) against the findings that survived step 1. A basis the challenger removed, that matches nothing, or that matches more than one surviving finding is dropped — an ambiguous title is not a resolved basis.
    2. Disjointness: process the composites in the order returned; a basis already resolved into an earlier composite is dropped from every later one, so no finding is a component of two composites.
    3. Fewer than two bases remain → do **not** render the composite as a finding block; keep its text as a plain bullet under `### Cross-Analysis` in the Verification Summary, never as a `###` heading.
-   4. Otherwise build a finding block in the Review Comment Format: severity = the greater of the composite's own severity and the maximum basis severity; `**Category:** Composite`; `**Location:**` and `**Effort:**` from the composite; `**Problem:**` from its `Cause`; `**Impact:**` from its `Combined risk`; `**Remediation:**` from its `Remediation`; `**Composed-of:**` = the resolved bases (filled with final IDs in Step 5.6); `**Origin:** review`; and `**Fix-policy:** needs-decision` when any basis carries a `**Fix-policy:**` value other than `auto`. `**Location:**` must parse as `path:line` or `path:line-range`, be contained in the repository tree, and exist there — a composite whose location fails any of the three is not rendered as a block and stays a bullet, never repaired.
+   4. Otherwise build a finding block in the Review Comment Format: severity = the greater of the composite's own severity and the maximum basis severity; `**Category:** Composite`; `**Location:**` and `**Effort:**` from the composite; `**Problem:**` from its `Cause`; `**Impact:**` from its `Combined risk`; `**Remediation:**` from its `Remediation`; `**Composed-of:**` = the resolved bases (filled with final IDs in Step 5.6); `**Origin:** review`; and `**Fix-policy:** needs-decision` when any basis carries a `**Fix-policy:**` value other than `auto`. `**Location:**` must parse as `path:line` or `path:line-range`, be contained in the repository tree, and exist there — a composite whose location fails any of the three is not rendered as a block and stays a bullet, never repaired. Each resolved basis's `**Location:**` must pass those same three checks — the fixer opens every component's site, not the composite's alone — and a basis whose location fails any of them is dropped from `Composed-of` exactly as sub-item 1 drops an unresolvable one, leaving the composite a bullet under sub-item 3 where fewer than two bases survive.
 3. Tag confirmed findings as `[verified]`
 4. Reinstate spot-checked rejections: each entry in the Challenger's
    `### Rejected findings (spot-check)` subsection has the shape
@@ -358,12 +358,15 @@ For each issue found, format as structured markdown:
 
 **ID:** {ID}
 **Location:** `path/to/file.py:42`
-**Category:** Security | Performance | Architecture | Maintainability | Documentation
+**Category:** Security | Performance | Architecture | Maintainability | Documentation | Composite
 **OWASP:** A05:2025 (if applicable)
 **CWE:** CWE-89 (if applicable)
 **Effort:** trivial | easy | medium | hard
 **Drift-class:** mechanical | decision | dead-reference   <- documentation findings only
 **Fix-policy:** auto | needs-decision                     <- documentation findings, and any reinstated finding with Location `—`
+**Composed-of:** ID, ID[, ID…]                            <- Composite findings only
+**Origin:** review | fix-time                             <- Composite findings only
+**Part-of:** COMP-NNN                                     <- components of a composite only
 
 **Problem:**
 Brief description of what's wrong and why it matters.

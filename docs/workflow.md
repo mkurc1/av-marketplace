@@ -124,11 +124,10 @@ analysis with addressable findings.
 /review
 ```
 
-The report assigns each issue a unique ID (`SEC-XXX`, `PERF-XXX`,
-`ARCH-XXX`, `MAINT-XXX`, `DOC-XXX`). Fix a single issue with `/fix <ID>`,
-work through reports as a checklist with `/fix-report` (auto-merges
-review and QA reports), or fix everything except `needs-decision` issues
-with `/fix-all`.
+The report assigns each issue a unique ID (`SEC-XXX`, `PERF-XXX`, `ARCH-XXX`,
+`MAINT-XXX`, `DOC-XXX`, `COMP-XXX`). Fix a single issue with `/fix <ID>`, work
+through reports as a checklist with `/fix-report` (auto-merges review and QA
+reports), or fix everything except `needs-decision` issues with `/fix-all`.
 
 **Artifact:** review report in `docs/reviews/` — answer Yes at the save
 prompt; `/fix <ID>` and `/fix-report` resolve issues from the saved file.
