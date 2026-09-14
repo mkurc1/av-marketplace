@@ -472,7 +472,7 @@ The append has not landed if the bracketed field still ends with the entry it ca
 
 This is the one check whose absence is not merely cosmetic. The attempt entry is what advances the two-attempt retirement counter; a lost append freezes it, and a decision that fails every run then replays forever with the escape to `reject` unreachable behind it — precisely the failure retirement exists to prevent. A status line that fails to land costs an annotation; an attempt entry that fails to land costs the loop its exit.
 
-**The `**Verification:**` line, checked for the whole decision batch.** Both writes carry it: `code-review:decision-gate`'s *Stage 4* writes the `**Verification:**` line **in the same write as the `**Status:**` line**, and, for the two cases that write no status, **in the write that appends the attempt entry**. So every graded finding of the decision batch acquires one, whichever case it fell into, and this check runs over the whole iteration set rather than over one group of it. The `auto` findings Steps 3–4 handled carry no decision record and no `**Verification:**` line, so this check does not reach the Step 4 run at all — only the Step 5.5 re-run.
+**The `**Verification:**` line, checked for the whole decision batch.** Both writes carry it: `code-review:decision-gate`'s *Stage 4* writes the `**Verification:**` line **in the same write as the `**Status:**` line**, and, for the two cases that write no status, **in the write that appends the attempt entry**. So every graded finding of the decision batch acquires one, whichever case it fell into, and this check runs over the whole iteration set rather than over one group of it. The `auto` findings Steps 3–4 handled carry no decision record and, with one exception, no `**Verification:**` line, so for them this check reaches only the Step 5.5 re-run. The exception is a composite and its `resolved` components fixed on the auto path: Step 4.1 writes each of their `**Status:**` lines together with a `**Verification:** advisory — <checks run>` line, and for those blocks this check runs in the Step 4 pass too, exactly as below — the value is `advisory`, since it records the fixer's own re-read rather than an orchestrator-run check.
 
 For each finding of the decision batch, the verification is:
 
@@ -533,6 +533,7 @@ Status icons: Fixed = ✅, Partially Fixed = ⚠️, Failed = ❌.
 **Composition:**
 - Proposed: 2 | Written to the report: 1 | Dropped proposals: 1 | Marked 🚫 Rejected (dissolved): COMP-004
 - Dropped by validation: SEC-004 + SEC-005 — member not a candidate
+- Malformed composites: COMP-005 — Composed-of names SEC-099, which has no block in the file
 - Rejected by the analyst: SEC-006 + SEC-007 — same file, different mechanism
 - Verification coverage: 2 of 3 components checked (ARCH-001: no location)
 - Marker write failures: COMP-003 — marker-write-failed
@@ -540,7 +541,7 @@ Status icons: Fixed = ✅, Partially Fixed = ⚠️, Failed = ❌.
 - Dissolve question: unavailable — <reason>; all composites dissolved for this run   <-- only where Step 2.4.5's fail-closed path applied
 ```
 
-`Written to the report` counts only the proposals this run persisted; `Dropped proposals` the proposals dissolved before persistence; `Marked 🚫 Rejected (dissolved)` lists the persisted composites whose block received the dissolution status; `Rejected by the analyst` renders the analyst's `## Rejected groupings`, one line per grouping; `Verification coverage` names each component the fixer could not check. Omit any line whose value is empty; omit the block when the run held no composite and the pass was not unavailable.
+`Written to the report` counts only the proposals this run persisted; `Dropped proposals` the proposals dissolved before persistence; `Marked 🚫 Rejected (dissolved)` lists the persisted composites whose block received the dissolution status; `Rejected by the analyst` renders the analyst's `## Rejected groupings`, one line per grouping; `Verification coverage` names each component the fixer could not check. `Malformed composites` lists each composite Step 1.6.1 set aside as malformed, with the reason. Omit any line whose value is empty; omit the block when the run held no composite and the pass was not unavailable.
 
 **Restart safety.** Markers are on disk before the first dispatch, so an interrupted run leaves its successor the same composites: an open composite is retried whole, and a component fixed through a composite is filtered by Step 1.3 like any fixed finding.
 
