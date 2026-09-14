@@ -109,6 +109,25 @@ class CompositeContract(unittest.TestCase):
         # mutation: delete "at most twelve" from composition-analyst.md
         self.assertIn("at most twelve", read(ANALYST))
 
+    # ---- Task 4: review side --------------------------------------------
+
+    def test_cross_verifier_composite_format_fields(self):
+        # mutation: delete `Location:`, `Effort:` or `Cause:` from cross-verifier.md's Composite Findings format
+        block = read(CROSS).split("### Composite Findings", 1)[1]
+        for field in ("Location:", "Effort:", "Cause:", "Combined risk:", "Remediation:"):
+            self.assertIn(field, block, f"{field} missing from the composite format")
+
+    def test_cross_verifier_one_change_criterion(self):
+        # mutation: delete "only where one change resolves every basis" from cross-verifier.md
+        self.assertIn("only where one change resolves every basis", read(CROSS))
+
+    def test_review_renders_composites(self):
+        # mutation: delete the Step 5.5 item-2 body ("Disjointness") or the `comp_count` counter from review.md
+        text = read(REVIEW)
+        self.assertIn("comp_count", text)
+        self.assertIn("**Part-of:**", text)
+        self.assertIn("Disjointness", text)
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)

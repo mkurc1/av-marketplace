@@ -64,8 +64,7 @@ When correlating findings across domains, apply these calibration rules:
 
 ### 6. Composite Findings
 
-Create findings that emerge only from cross-analysis:
-- "Module X has both a SQL injection vulnerability AND is a God Object with no tests — risk is compounded"
+Create findings that emerge only from cross-analysis — but **only where one change resolves every basis**. A composite is one cause and one fix: "Module X has a SQL injection vulnerability AND is a God Object with no tests" is a composite only if a single refactor closes all three; where the bases need separate fixes, report a correlation under section 1–3 instead, never a composite. Cite each basis by the exact finding title the auditor wrote (a documentation basis may cite its `DOC-NNN` ID). Never cite one basis in two composites.
 
 ## Output Format
 
@@ -88,11 +87,14 @@ Create findings that emerge only from cross-analysis:
 
 ### Composite Findings
 - [COMPOSITE-{N}] [{SEVERITY}] {title}
-  Security basis: {finding ID}
-  Quality basis: {finding ID}
-  Documentation basis: {finding ID} (if applicable)
-  Combined risk: {explanation}
-  Remediation: {fix that addresses both aspects}
+  Security basis: {finding title}
+  Quality basis: {finding title}
+  Documentation basis: {finding title or DOC-NNN} (if applicable)
+  Location: {path:line — the primary site of the single fix}
+  Effort: {trivial | easy | medium | hard}
+  Cause: {the shared cause, one paragraph}
+  Combined risk: {what the combination costs}
+  Remediation: {the single change that resolves every basis}
 ```
 
 ## Important

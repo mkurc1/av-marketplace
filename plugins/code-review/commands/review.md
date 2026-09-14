@@ -279,7 +279,11 @@ challenger_results = TaskOutput(challenger_id, block: true)
 **5. Merge enhanced findings:**
 
 1. Apply Challenger decisions (remove false positives, adjust severity)
-2. Add Cross-Verifier composite findings
+2. Add Cross-Verifier composite findings. For each `[COMPOSITE-N]` the cross-verifier returned:
+   1. Resolve each basis by exact title (or `DOC-NNN` ID) against the findings that survived step 1. A basis the challenger removed, that matches nothing, or that matches more than one surviving finding is dropped — an ambiguous title is not a resolved basis.
+   2. Disjointness: process the composites in the order returned; a basis already resolved into an earlier composite is dropped from every later one, so no finding is a component of two composites.
+   3. Fewer than two bases remain → do **not** render the composite as a finding block; keep its text as a plain bullet under `### Cross-Analysis` in the Verification Summary, never as a `###` heading.
+   4. Otherwise build a finding block in the Review Comment Format: severity = the greater of the composite's own severity and the maximum basis severity; `**Category:** Composite`; `**Location:**` and `**Effort:**` from the composite; `**Problem:**` from its `Cause`; `**Impact:**` from its `Combined risk`; `**Remediation:**` from its `Remediation`; `**Composed-of:**` = the resolved bases (filled with final IDs in Step 5.6); `**Origin:** review`; and `**Fix-policy:** needs-decision` when any basis carries a `**Fix-policy:**` value other than `auto`. `**Location:**` must parse as `path:line` or `path:line-range`, be contained in the repository tree, and exist there — a composite whose location fails any of the three is not rendered as a block and stays a bullet, never repaired.
 3. Tag confirmed findings as `[verified]`
 4. Reinstate spot-checked rejections: each entry in the Challenger's
    `### Rejected findings (spot-check)` subsection has the shape
@@ -449,6 +453,8 @@ Include this section in the review output:
 {Same bullet format; `None` when empty.}
 ```
 
+The "Cross-analysis findings" count is the number of composites rendered as finding blocks.
+
 ---
 
 ## Step 5.6: Assign Issue IDs
@@ -470,6 +476,7 @@ Before rendering the final report, assign unique identifiers to each issue based
    - `arch_count = 0` (Architecture)
    - `maint_count = 0` (Maintainability)
    - `doc_count = 0` (Documentation)
+   - `comp_count = 0` (Composite)
 
 3. For each issue (in the order they appear in the report):
    - Read the issue's `Category` field
@@ -479,6 +486,8 @@ Before rendering the final report, assign unique identifiers to each issue based
    - Modify the issue heading: `### [SEVERITY] {ID}: Title`
    - Add `**ID:** {ID}` field right after the heading (before **Location:**)
    - Preserve `**Drift-class:**` and `**Fix-policy:**` field lines verbatim when re-rendering issue blocks — they must reach the saved report for `/fix-all`'s Fix-policy filter to work.
+
+4. **Composites last.** Assign `COMP-NNN` IDs only after every other finding has its ID, so `**Composed-of:**` renders with final IDs. For each composite block: fill `**Composed-of:**` with the resolved bases' final IDs on one physical line (`SEC-002, SEC-003, ARCH-001`); insert `**Part-of:** COMP-NNN` into each basis block directly after its `**ID:**` line; render the composite block after the non-composite findings of the same severity. Composites never nest and a basis belongs to at most one composite — both hold by construction of Step 5.5 item 2.
 
 **Example transformation:**
 
