@@ -188,6 +188,26 @@ class CompositeContract(unittest.TestCase):
         # mutation: delete the composite paragraph from decision-analyst.md's Input section
         self.assertIn("composite block plus each component block", read(DECISION_ANALYST))
 
+    # ---- Task 8: /fix ----------------------------------------------------
+
+    def test_fix_component_question(self):
+        # mutation: delete Step 0.4.5 or its question "is part of composite" from fix.md
+        text = read(FIX)
+        self.assertIn("### Step 0.4.5: A component of an open composite", text)
+        self.assertIn("is part of composite", text)
+
+    def test_fix_root_cause_only_rule_verbatim(self):
+        # mutation: delete the italic root-cause-only rule from fix.md Phase 4
+        self.assertIn("it is never applied, in this phase or in Phase 6's iterations", read(FIX))
+
+    def test_fix_runs_composite_itself(self):
+        # mutation: delete "never through `fix-auto`" from fix.md
+        self.assertIn("never through `fix-auto`", read(FIX))
+
+    def test_fix_components_table(self):
+        # mutation: delete the `**Components:**` table from fix.md Phase 7
+        self.assertIn("**Components:**", read(FIX))
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)
