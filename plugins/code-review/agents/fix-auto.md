@@ -87,6 +87,10 @@ Use Read tool to read the file at the parsed Location. Focus on:
 - The function/method/class containing the issue
 - 20-30 lines of surrounding context
 
+**Step 2.1b: Composite mode — read every component first**
+
+In composite mode, before anything else in this phase, read the composite's `Location` and then every component's `Location` with 20–30 lines of context (a component without a usable `Location` is noted and skipped). The root-cause change is designed against the symptoms as they stand in the tree, never against their descriptions alone: a fix planned without reading the symptoms is exactly the local-patch failure this mode exists to prevent.
+
 **Step 2.2: Understand the code structure**
 
 Identify:

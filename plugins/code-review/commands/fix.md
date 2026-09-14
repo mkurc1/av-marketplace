@@ -1,5 +1,5 @@
 ---
-allowed-tools: Read, Edit, Write, Glob, Grep, Bash(git:*), Bash(pytest:*), Bash(ruff:*), Bash(mypy:*), Bash(semgrep:*), Bash(npm test:*), Bash(eslint:*), Bash(tsc:*), Bash(bandit:*), Bash(trufflehog:*), Bash(command:*), Bash(jq:*), TaskCreate, TaskUpdate, TaskList
+allowed-tools: Read, Edit, Write, Glob, Grep, Bash(git:*), Bash(pytest:*), Bash(ruff:*), Bash(mypy:*), Bash(semgrep:*), Bash(npm test:*), Bash(eslint:*), Bash(tsc:*), Bash(bandit:*), Bash(trufflehog:*), Bash(command:*), Bash(jq:*), TaskCreate, TaskUpdate, TaskList, AskUserQuestion
 description: Apply fix for a single code review issue with verification and reporting.
 model: opus
 argument-hint: <issue-id|full issue block from /review report>
@@ -95,11 +95,11 @@ Once found, extract the complete issue block:
 
 This extracted block becomes the input for Phase 1.
 
-**A composite by ID.** When the block carries `**Category:** Composite` and a `**Composed-of:**` line, also extract every component block named in `Composed-of` that exists in the same report — already-fixed and rejected ones included, each with its `**Status:**` line — and assemble the payload: the composite block first, then each component block in `Composed-of` order, every block passed through the dispatch-copy rule of `code-review:decision-gate` stage 3 (loop-written lines stripped; `Location` and any pre-existing `Status` travel). Fewer than two **unfixed** components → the composite is degenerate: report `Composite {ID} is degenerate — fix {remaining ID} directly with /fix {remaining ID}` (or, with none left, `Composite {ID} has no open components`) and stop. `/fix` runs the composite itself, never through `fix-auto`: Phases 1–8 below carry composite mode where they say so.
+**A composite by ID.** When the block carries `**Category:** Composite` and a `**Composed-of:**` line, also extract every component block named in `Composed-of` that exists in the same report — already-fixed and rejected ones included, each with its `**Status:**` line — and assemble the payload: the composite block first, then each component block in `Composed-of` order, every block passed through the dispatch-copy rule of `code-review:decision-gate` stage 3 (loop-written lines stripped; `Location` and any pre-existing `Status` travel). Fewer than two **unfixed** components → the composite is degenerate: report `Composite {ID} is degenerate — fix {remaining ID} directly with /fix {remaining ID}` (or, with none left, `Composite {ID} has no open components`) and stop. An ID in `Composed-of` with no block in the report at all makes the composite malformed: report `Composite {ID} is malformed — {absent ID} has no block in the report; repair Composed-of or dissolve the composite by hand` and stop before Phase 1. `/fix` runs the composite itself, never through `fix-auto`: Phases 1–8 below carry composite mode where they say so.
 
 ### Step 0.4.5: A component of an open composite
 
-If the block extracted in Step 0.4 is **not** a composite, scan the report for an open composite — a block of `**Category:** Composite` carrying no `**Status:**` line — whose `**Composed-of:**` names this ID. If one exists, ask with AskUserQuestion, question `{ID} is part of composite {COMP-ID}. Fix which?`, three options:
+If the block extracted in Step 0.4 is **not** a composite and carries no `**Status:**` line, scan the report for an open composite — a block of `**Category:** Composite` carrying no `**Status:**` line — whose `**Composed-of:**` names this ID. If one exists, ask with AskUserQuestion, question `{ID} is part of composite {COMP-ID}. Fix which?`, three options:
 
 - label `Fix {COMP-ID} (recommended)`, description `{composite title} — one root-cause change resolving {every component ID}`;
 - label `Fix {ID} alone`, description `Local fix only — the shared cause stays and {COMP-ID} returns whole on the next bulk run`;
@@ -213,6 +213,10 @@ Use Read tool to read the file at the parsed Location. Focus on:
 - The specific line(s) mentioned in the issue
 - The function/method/class containing the issue
 - 20-30 lines of surrounding context
+
+**Step 2.1b: Composite mode — read every component first**
+
+In composite mode, before anything else in this phase, read the composite's `Location` and then every component's `Location` with 20–30 lines of context (a component without a usable `Location` is noted and skipped). The root-cause change is designed against the symptoms as they stand in the tree, never against their descriptions alone: a fix planned without reading the symptoms is exactly the local-patch failure this mode exists to prevent.
 
 **Step 2.2: Understand the code structure**
 
@@ -617,13 +621,14 @@ If status is **Failed**, do NOT modify the report. The issue remains unfixed and
 
 ### Step 8.4.5: Composite mode — propagate to components
 
-Map by the fixer verdict: **Fixed** → `✅ Fixed` on the composite and on each `resolved` component; **Partially Fixed** → `⚠️ Partially Fixed` on the composite and `✅ Fixed` on each `resolved` component, no status on the others (released; they return individually on the next bulk run); **Failed** → no status anywhere. Each component's line is inserted after that component's own `### [SEVERITY] {ID}: Title` heading by Step 8.2's recipe — the same `old_string`/`new_string` insert, once per block written. A component skipped in Phase 1 keeps the status it already carried and is never written to. Each `**Status:**` line written here is written together with a `**Verification:** advisory — <checks run>` line, in the form `code-review:decision-gate`'s stage 4 writes it, because the component result rests on your own re-read. Step 8.1.5 applies to every block written: never a second `**Status:**` line.
+Map by the fixer verdict: **Fixed** → `✅ Fixed` on the composite and on each `resolved` component; **Partially Fixed** → `⚠️ Partially Fixed` on the composite and `✅ Fixed` on each `resolved` component, no status on the others (released; they return individually on the next bulk run); **Failed** → no status anywhere. Each component's line is inserted after that component's own `### [SEVERITY] {ID}: Title` heading by Step 8.2's recipe — the same `old_string`/`new_string` insert, once per block written. A component skipped in Phase 1 keeps the status it already carried and is never written to. Each `**Status:**` line written here — the composite's own included — is written together with a `**Verification:** advisory — <checks run>` line, in the form `code-review:decision-gate`'s stage 4 writes it, because the component result rests on your own re-read. Step 8.1.5 applies to every block written: never a second `**Status:**` line.
 
 ### Step 8.5: Confirm update
 
 After editing the report, display:
 
 > Issue `{ID}` marked as {Status} in report: `{report-path}`
+> (composite mode: also `{component ID}` → {status} for each component written)
 
 **Task Update:** Mark task 7 as `completed` using TaskUpdate.
 

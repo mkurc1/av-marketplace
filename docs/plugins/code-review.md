@@ -86,7 +86,7 @@ The command:
 5. Fixes selected issues sequentially via the `fix-auto` agent
 6. Marks fixed issues with `**Status:** ✅ Fixed (YYYY-MM-DD)` back in the file each issue came from (auto-merge may write to multiple files in one run)
 
-- runs the same composition pass, asks the dissolve question before the checklist, shows a composite as one checklist item, and persists selected composites after selection, before the decision gate.
+- `/fix-report` runs the same composition pass, asks the dissolve question before the checklist, shows a composite as one checklist item, and persists selected composites after selection, before the decision gate.
 
 The reports become living documents — fixed issues won't appear on subsequent `/fix-report` runs.
 
@@ -219,7 +219,7 @@ Reports sourced from `/review` directly do not include a `Source:` field and car
 >
 > One level down, the same holds for the fixes themselves: `fix-auto` holds unrestricted `Edit`, `Write` and `Bash`, so the orchestrator's before/after observation of the tree can see a write outside the files the decision pinned but cannot stop one. Such a write is reported, not prevented — and it is named only in the run summary, which does not survive the session that printed it, so nothing about it reaches the report a later reader would find.
 
-A needs-decision composite goes through the stage as one finding: the analyst receives the composite block plus its component blocks (each feedback-origin component wrapped as untrusted data on its own), the plan carries one check per component, each prefixed with the component's ID (`SEC-002: <check> → <expected>`) — the prefix is how the orchestrator attributes a check to a component, each component's file is pinned `:ref`, and stage 4 grades the components from the plan's raw output — the fixer's Components table is advisory.
+A needs-decision composite goes through the stage as one finding: the analyst receives the composite block plus its component blocks (each feedback-origin component wrapped as untrusted data on its own), the plan carries one check per open component (none for one already fixed or rejected), each prefixed with the component's ID (`SEC-002: <check> → <expected>`) — the prefix is how the orchestrator attributes a check to a component, each component's file is pinned `:ref`, and stage 4 grades the components from the plan's raw output — the fixer's Components table is advisory.
 
 ### Where the two entry points differ
 
@@ -293,7 +293,7 @@ Several findings often share one cause: five "missing validation in endpoint X" 
 **Remediation:** the single change that resolves every component
 ```
 
-Each component carries `**Part-of:** COMP-001` after its `**ID:**` line. `**Composed-of:**` is the source of truth for membership (two to twelve IDs from the same report, on one physical line); `Part-of` is a derived back-reference. A composite's severity is never below its components' maximum; composites never nest; a component belongs to at most one open composite. `**Fix-policy:** needs-decision` is inherited when any component carries a non-`auto` policy.
+Each component carries `**Part-of:** COMP-001` after its `**ID:**` line. `**Composed-of:**` is the source of truth for membership (two to twelve IDs from the same report, on one physical line); `Part-of` is a derived back-reference. A composite's severity is never below its components' maximum (the fix commands raise a hand-edited block's effective severity to that maximum for the run without rewriting it); composites never nest; a component belongs to at most one open composite. `**Fix-policy:** needs-decision` is inherited when any component carries a non-`auto` policy.
 
 **Where composites come from.** `/review` renders the cross-verifier's composite findings as `COMP` blocks — only where one change resolves every basis, bases kept disjoint, `COMP` IDs assigned last so `Composed-of` carries final IDs. `/fix-all` and `/fix-report` additionally run a **composition pass** (Step 1.6) before their pre-flight: a read-only `composition-analyst` agent reads the unfixed, ungrouped findings of each review report and proposes groups that share one cause and one fix, with a citation per member and a self-falsification battery; the command re-validates every proposal (membership, size, disjointness, a usable and contained `Location`) and assigns the next `COMP-NNN`. A composite whose `Composed-of` names an ID with no block in the report is malformed: the pass sets it aside, lists it as `malformed-composite`, fixes its present components individually, and leaves it open until repaired or dissolved. QA reports are never grouped, and `/qa:loop` is untouched.
 
