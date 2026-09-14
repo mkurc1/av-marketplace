@@ -88,6 +88,27 @@ class CompositeContract(unittest.TestCase):
         # mutation: delete "The verdict is computed over the components actually checked" from fix-auto.md Phase 6
         self.assertIn("The verdict is computed over the components actually checked", read(FIX_AUTO))
 
+    # ---- Task 3: composition-analyst ------------------------------------
+
+    def test_analyst_frontmatter(self):
+        # mutation: change `tools:` or drop `skills: finding-falsification` in composition-analyst.md
+        text = read(ANALYST)
+        head = text.split("---")[1]
+        self.assertIn("name: composition-analyst", head)
+        self.assertRegex(head, r"(?m)^tools: Read, Grep, Glob$", "tools must be exactly Read, Grep, Glob")
+        self.assertIn("skills: finding-falsification", head)
+        self.assertNotIn("allowed-tools", head)
+
+    def test_analyst_closing_line_and_rejected_section(self):
+        # mutation: delete the closing-line sentence or the `## Rejected groupings` requirement from composition-analyst.md
+        text = read(ANALYST)
+        self.assertIn("Composition: <N> groups proposed over <M> findings", text)
+        self.assertIn("## Rejected groupings", text)
+
+    def test_analyst_membership_cap(self):
+        # mutation: delete "at most twelve" from composition-analyst.md
+        self.assertIn("at most twelve", read(ANALYST))
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)
