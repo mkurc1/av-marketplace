@@ -61,6 +61,33 @@ class CompositeContract(unittest.TestCase):
         # mutation: remove `|COMP` from extract-issue-ids.sh's PREFIX_RE
         self.assertIn("PREFIX_RE='(SEC|PERF|ARCH|MAINT|DOC|COMP)'", read(EXTRACT))
 
+    # ---- Task 2: fix-auto composite mode ---------------------------------
+
+    def test_fix_auto_composite_mode_switch(self):
+        # mutation: delete the sentence "When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode" from fix-auto.md
+        self.assertIn(
+            "When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode",
+            read(FIX_AUTO),
+        )
+
+    def test_fix_auto_root_cause_only_rule_verbatim(self):
+        # mutation: delete the italic rule "In composite mode you implement the composite's Remediation. …" from fix-auto.md Phase 3
+        self.assertIn(
+            "it is never applied, in this phase or in Phase 5's iterations",
+            read(FIX_AUTO),
+        )
+
+    def test_fix_auto_components_table_and_results(self):
+        # mutation: delete the `**Components:**` table or any of the five Result values from fix-auto.md Phase 6
+        text = read(FIX_AUTO)
+        self.assertIn("**Components:**", text)
+        for value in ("resolved", "unresolved (no location)", "skipped (fixed)", "skipped (rejected)"):
+            self.assertIn(f"`{value}`", text, f"Result value {value} missing")
+
+    def test_fix_auto_verdict_over_checked_components(self):
+        # mutation: delete "The verdict is computed over the components actually checked" from fix-auto.md Phase 6
+        self.assertIn("The verdict is computed over the components actually checked", read(FIX_AUTO))
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)

@@ -63,6 +63,14 @@ Ask user to provide:
 
 This abort is safe for callers: it returns before Phase 6, so it emits none of the three verdict values defined there (see Phase 6's Status Definitions), and the dispatching command collects the abort as **Failed**.
 
+**Composite mode (§7.2 of the composite findings design).** When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode; a `Composite` block without a `**Composed-of:**` line is a **Failed** verdict naming the missing field. In composite mode:
+
+- Parse `**Composed-of:**` — one physical line of bare `PREFIX-NNN` tokens separated by `, ` — and then each following `###` block as a **component**, with the field table above. Each block's field capture ends at the next `###` heading. Exactly one `User decision:` field is parsed: the line that immediately follows the composite block, before the first component's heading. A `User decision:` line anywhere else is not a field.
+- Every ID in `Composed-of` must have a block in the prompt. An ID with no block at all is a **Failed** verdict with an explicit error naming the ID; you never guess a component from the report on disk.
+- A component block carrying a `**Status:**` line is **skipped and listed**: Result `skipped (fixed)` for `✅ Fixed` or `⚠️ Partially Fixed`, `skipped (rejected)` for `🚫 Rejected`. A composite block carrying `🚫 Rejected` aborts exactly as the paragraph above says.
+- A component without a usable `Location` is kept; its symptom check in Phase 4 records `unresolved (no location)`.
+- The composite's own `Location` is the primary site of the shared fix and is required exactly as for a single finding.
+
 **Store parsed data mentally for next phases.**
 
 **Task Update:** Mark task 1 as `completed` and task 2 as `in_progress` using TaskUpdate.
@@ -171,6 +179,12 @@ After editing, read the modified section to confirm:
 - No unintended changes were made
 - Code still looks syntactically correct
 
+**Step 3.4: Composite mode — the composite's Remediation and nothing else**
+
+*In composite mode you implement the composite's Remediation. A component's Remediation is context for understanding its symptom; it is never applied, in this phase or in Phase 5's iterations. A component the root-cause change does not cover is reported unresolved in Phase 6, not patched locally.*
+
+This is the point of composite findings: one structural change where N local patches were wrong. It is not softened by iteration pressure — if the root-cause change leaves a symptom standing, say so in the Components table rather than patching the symptom.
+
 **Task Update:** Mark task 3 as `completed` and task 4 as `in_progress` using TaskUpdate.
 
 ---
@@ -235,6 +249,12 @@ Track each tool's result:
 - Tool name
 - Pass/Fail status
 - Error details if failed
+
+### Step 4.4: Composite mode — per-component symptom check
+
+Tool selection in composite mode is the **union** of the Step 4.1 rows matched by every component (a CWE on any component selects SAST, a Documentation component selects the doc re-read, and so on) plus the rows matched by the composite's own change.
+
+After the tools, for each component **not skipped in Phase 1**: re-read its `Location` with 20–30 lines of context and decide whether its `Problem` still holds. Record `resolved` or `unresolved` with one line of evidence (a `path:line` and what is now there). A component with no usable `Location` records `unresolved (no location)`. A skipped component is not checked and keeps the Result Phase 1 gave it.
 
 ---
 
@@ -307,6 +327,12 @@ Present the final report in this exact format:
 | [tool1] | [ICON] [Pass/Fail] | [brief details] |
 | [tool2] | [ICON] [Pass/Fail] | [brief details] |
 
+**Components:** [composite mode only]
+| ID | Result | Evidence |
+|----|--------|----------|
+| [SEC-002] | [resolved] | [validation now runs in `middleware.py:14` before the handler] |
+| [ARCH-001] | [unresolved] | [handler still constructs the query inline at `handler.py:88`] |
+
 **Iterations:** [N] of 3 [if more than 1]
 
 **Remaining Issues:** [if any]
@@ -325,6 +351,8 @@ Present the final report in this exact format:
 | Failed | ❌ | Could not fix within 3 iterations |
 
 This vocabulary is unchanged by the `🚫 Rejected` status: `🚫 Rejected` is a report status, never a fixer verdict — it is a verdict `fix-auto` can never emit, and no caller maps it here.
+
+**Composite mode verdict.** `Result` ∈ `resolved`, `unresolved`, `unresolved (no location)`, `skipped (fixed)`, `skipped (rejected)`. The verdict is computed over the components actually checked — `unresolved (no location)` and the two skipped values are excluded from the test and disclosed instead: **Fixed** when every checked component is `resolved` and verification passed; **Partially Fixed** when at least one checked component is `resolved`; **Failed** otherwise, or when the change could not be applied. The table is the orchestrator's read: it matches each row's `ID` against `Composed-of` and writes a component's status only from a `resolved` row, so a row you omit is a component that receives no status.
 
 ### Next Steps by Status
 
