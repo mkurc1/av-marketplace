@@ -1,6 +1,6 @@
 ---
 name: decision-gate
-description: Use when resolving code-review findings flagged needs-decision in bulk — the analysis fan-out, the decision sweep and its five outcomes, the dispatch contract, orchestrator-run verification, and the decision record written into the report. Loaded by /fix-report and /fix-all; /fix loads it for the Alternatives render format alone.
+description: Use when resolving code-review findings flagged needs-decision in bulk — the analysis fan-out, the decision sweep and its five outcomes, the dispatch contract, orchestrator-run verification, and the decision record written into the report. Loaded by /fix-report and /fix-all; /fix loads it for the Alternatives render format and, in composite mode, stage 3's dispatch-copy rule.
 ---
 
 # Decision Gate
@@ -11,7 +11,7 @@ This skill is the **single source of truth for the decision stage**: stage 0's l
 
 It carries stage 2's render as well, so that every entry point renders one gate.
 
-Loaded in full by `/fix-report` and `/fix-all`. `/fix` loads it for the `Alternatives:` render format alone: `/fix`'s own gate stays `(A / B / no)`, `/fix` never writes `🚫 Rejected`, and the five-outcome sweep belongs to `/fix-report` and `/fix-all`.
+Loaded in full by `/fix-report` and `/fix-all`. `/fix` loads it for the `Alternatives:` render format and, when it builds a composite payload, for stage 3's dispatch-copy rule: `/fix`'s own gate stays `(A / B / no)`, `/fix` never writes `🚫 Rejected`, and the five-outcome sweep belongs to `/fix-report` and `/fix-all`.
 
 ### *Where* the stages run differs by command
 
@@ -62,6 +62,8 @@ A location is usable **iff** it parses as `path:line` or `path:line-range`, **an
 Under either clause a value of `—`, `unknown:0`, or anything that does not parse as `path:line` or `path:line-range` is **location-less** — and so is a path that parses but fails the containment test below.
 
 Never scan the whole line. A `—` or an `unknown:0` inside the `(was: …)` tail is part of the reviewer's original inline and is never the location; a whole-line test reads a repaired finding as location-less and silently drops it.
+
+**A composite is one finding here.** A needs-decision finding of `**Category:** Composite` goes through every stage of this skill as a single finding: stage 0 checks the composite block's own `**Location:**` (the primary site of the shared fix); its components are neither pre-checked nor asked for separately.
 
 ### Containment, not just existence
 
@@ -123,6 +125,10 @@ It is not inert prose here. The analyst's return decides what the sweep re-runs 
 
 The flag itself travels the whole way: set at Step 1.4, carried into this dispatch, rendered at the gate by stage 2's `Source` row, and present again in the stage 3 dispatch copy, where the reviewer-authored `**Source:**` line is not on the strip list and travels with the rest of the reviewer-authored block.
 
+### A composite is dispatched as one payload, wrapped per block
+
+The analyst receives a composite as the same payload the fixer would: the composite block plus each component block named in its `**Composed-of:**`, in that order — every ID that still has a block in the file, already-fixed and rejected components included with their `**Status:**` line. The rules above apply to **each block independently**: every component block carrying a `**Source:**` line is sanitised and wrapped in this invocation's nonce delimiters exactly as a single feedback-origin finding is, one nonce per analyst call, while the composite block's own lines travel outside them. With no `**Drift-class:**` on a composite, the analyst takes the fallback route: A is the composite's Remediation as written, B a direction derived from the code, or A alone.
+
 ---
 
 ## Stage 2: the decision sweep
@@ -138,6 +144,7 @@ What "render the block" means is fixed, so the reading cost of a decision is bou
 | **Always rendered** | `Target`; the `**Source:**` line where the block carries one, marked as feedback-origin; `Recommendation` with its reason; `Risk`; both `Alternatives` in full; `Code Preview`; and any `**Decision-retired:**` lines the block carries |
 | **Held back unless the user asks for it** | the verbatim command and tool output backing `Findings` — the claims themselves are always rendered — and both `Verification Plan`s |
 | **Always rendered and never held back** | the re-run raw output of a `Rejection candidate`'s citations, and the recorded/fresh output side by side where that re-run diverges — because the reject gate exists so that the user judges that evidence |
+- for a composite, its members — ID and title, in `Composed-of` order — under the `Target`, and a `Source` row for every component that carries one, marked feedback-origin, beside the composite's `Target`.
 
 **Why `Source` is in the always-rendered class.** The sweep is a per-finding human gate whose answer authorises a cited-evidence re-run and a fixer dispatch, and a feedback-origin finding's `Problem`, `Impact` and `Remediation` are a third party's unvalidated claims. Rendering the handle and the comment link beside `Target` is what lets the user weigh the proposal as one. `/fix-all`'s recorded no-provenance stance is about its **bulk auto checklist**, which already lists the handle in a column of its own; it does not reach this gate, and both entry points render this row because both run this sweep.
 
@@ -267,6 +274,8 @@ The mechanical test a `Verification Plan` is held to is **not scoped to the anal
 
 A plan that fails the test — **returned or derived** — is treated as **no plan for that alternative**: stage 3.5 runs nothing for it, and stage 4's fourth case applies.
 
+**A composite's plan is held to one more clause:** a plan for a composite carries at least one check per component **that carried no `**Status:**` line when the run began** — a component already fixed or rejected is skipped by the fixer and needs no check — whose expected result is that component's symptom being absent, and each such check is **attributed structurally** — it is prefixed with the component's ID, `SEC-002: <check> → <expected>`, so the orchestrator maps a check to a component by that prefix alone, never by matching the expected result's prose against a symptom. A check with no ID prefix is the composite's own. A plan with no ID-prefixed check for some open component is rejected as no plan for that alternative; a check for a skipped component is ignored. The `decision-analyst` contract carries the prefix grammar as a producer instruction and points here for the rule rather than restating it.
+
 ### How a check is decided
 
 A check passes when its **logged raw output matches the expected result recorded with it** on the `**Verification-plan:**` line — **never on exit status alone**, since a grep asserting an absence exits non-zero on success. A plan passes when every check that ran passes.
@@ -313,7 +322,7 @@ A grant here is **not** a boundary permission and never licenses a check. It rec
 | `plugins/code-review/commands/fix-all.md` | runs-the-stage | Loads this skill in full; Step 5 runs stages 0 → 3.5. |
 | `plugins/code-review/commands/fix-report.md` | runs-the-stage | Loads this skill in full. Step 2.4 runs stages 0–2 and hands the decided findings to Step 3; stage 3.5's verification then runs over those findings, under this boundary — see *Where the stages run* above, which is authoritative for the split. |
 | `plugins/code-review/skills/decision-gate/SKILL.md` | runs-the-stage | This file. Declares no `allowed-tools:`; the row keeps it that way. |
-| `plugins/code-review/commands/fix.md` | render-only | Loads the `**Alternatives:**` render format alone. Runs no stage, so no check of its executes under this boundary. |
+| `plugins/code-review/commands/fix.md` | dispatch-only | Loads the `**Alternatives:**` render format, and follows stage 3's dispatch-copy rule when it builds a composite payload (`/fix COMP-NNN`). Runs no stage, so no check of its executes under this boundary; its `Bash(git:*)` wildcard stays outside the grant diff only while its kind is not `runs-the-stage`. |
 | `plugins/qa/commands/loop.md` | dispatch-only | Follows stage 3's dispatch-copy rule and strips `**Verification-plan:**`. Runs neither the sweep nor stage 3.5. |
 | `plugins/qa/skills/report-format/SKILL.md` | reference-only | Reproduces the finding-block fields this skill writes. Declares no `allowed-tools:` and executes nothing. |
 
@@ -475,6 +484,10 @@ A rejection reaches none of this: `reject` never dispatches, so its
 `🚫 Rejected` status is stage 2's write and it carries no `**Verification:**`
 line at all.
 
+### A composite's components are graded from the plan, not the fixer's table
+
+Stage 4's graded case — not the fixer's verdict — decides the composite's status. A case that writes `✅ Fixed` or `⚠️ Partially Fixed` on the composite propagates to components in the same write-back pass: a component's `resolved`/`unresolved` value is decided by the check prefixed with that component's ID in the decided `**Verification-plan:**` (stage 3.5's attribution grammar), graded on its logged raw output exactly as the composite's status is; the fixer's `**Components:**` table is advisory input, never the deciding signal. A component whose block carried a `**Status:**` line when the run began — `✅ Fixed`, `⚠️ Partially Fixed` or `🚫 Rejected` — is never written to, whatever any check yields: the write-back writes a component's status only where the block has none, and `🚫 Rejected` is terminal here exactly as everywhere else. A `resolved` component receives `✅ Fixed`; a component that is not resolved receives no status and is released once the composite carries any status. A case that writes no status on the composite writes none on any component, and the composite returns whole next run. A component with no ID-prefixed check in the plan receives no status. A persisted `**Decision:**` on a composite replays like any other decision, and `reject` writes `🚫 Rejected` on the composite block, releasing its components.
+
 ---
 
 ## The decision record
@@ -591,7 +604,7 @@ The brackets mark an **alternation, not an option**: every pinned entry carries 
 
 Every hash is computed **after stage 2's writes have been applied**, over the block as it then stands. The block hash covers the finding block as Step 1.2 delimits it, with those loop-written lines removed. The **report file's own hash is never pinned**: stages 2 and 4 rewrite the report by design, so a whole-file pin would mismatch on every finding but the last, and it would be self-referential besides, since the pin line lives in the file it would hash.
 
-**The pinned file set** is the `Target` plus every `path[:line]` token appearing in the resolution text, in resolution-text order with the `Target` first. A path token is recognised **syntactically and never by testing the filesystem** — the `absent` rule exists precisely to pin paths that do not exist: a whitespace-delimited token holding at least one `/` or ending in a file extension, optionally followed by `:<line>` or `:<line>-<line>`, with trailing sentence punctuation stripped.
+**The pinned file set** is the `Target` plus every `path[:line]` token appearing in the resolution text, in resolution-text order with the `Target` first. A path token is recognised **syntactically and never by testing the filesystem** — the `absent` rule exists precisely to pin paths that do not exist: a whitespace-delimited token holding at least one `/` or ending in a file extension, optionally followed by `:<line>` or `:<line>-<line>`, with trailing sentence punctuation stripped. For a composite, one clause more: each component's `Location` path is pinned `:ref` unless the resolution already names it, in which case it keeps the `:edit` role the resolution gave it — an edit to a symptom's file between decision and dispatch invalidates the decision like any referent edit. Component *blocks* are not hashed: the block hash covers the composite's own block, and membership is protected because `**Composed-of:**` sits inside it.
 
 A pinned path that does not exist in the working tree is recorded as `<path>=absent` rather than hashed: `git hash-object` errors on a missing path, and "restore the referent" names one by construction, so hashing it would leave the pin unwritable and stage 4 would read a correct restore as no edit at all. `absent` → present and present → `absent` are both observable changes, exactly as a changed hash is. `absent` is a **recorded observation**, and so never interchangeable with the `unpinnable` state under *Sanitisation* below, which records that no observation was taken.
 

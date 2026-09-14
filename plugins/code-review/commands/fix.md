@@ -1,5 +1,5 @@
 ---
-allowed-tools: Read, Edit, Write, Glob, Grep, Bash(git:*), Bash(pytest:*), Bash(ruff:*), Bash(mypy:*), Bash(semgrep:*), Bash(npm test:*), Bash(eslint:*), Bash(tsc:*), Bash(bandit:*), Bash(trufflehog:*), Bash(command:*), Bash(jq:*), TaskCreate, TaskUpdate, TaskList
+allowed-tools: Read, Edit, Write, Glob, Grep, Bash(git:*), Bash(pytest:*), Bash(ruff:*), Bash(mypy:*), Bash(semgrep:*), Bash(npm test:*), Bash(eslint:*), Bash(tsc:*), Bash(bandit:*), Bash(trufflehog:*), Bash(command:*), Bash(jq:*), TaskCreate, TaskUpdate, TaskList, AskUserQuestion
 description: Apply fix for a single code review issue with verification and reporting.
 model: opus
 argument-hint: <issue-id|full issue block from /review report>
@@ -9,8 +9,8 @@ argument-hint: <issue-id|full issue block from /review report>
 
 Parse the input argument to determine mode:
 
-- **ID Mode:** If `$ARGUMENTS` matches pattern `^(SEC|PERF|ARCH|MAINT|DOC|QA)-\d{3}$`
-  - Examples: `SEC-001`, `PERF-042`, `ARCH-001`, `MAINT-999`, `DOC-001`, `QA-001`
+- **ID Mode:** If `$ARGUMENTS` matches pattern `^(SEC|PERF|ARCH|MAINT|DOC|QA|COMP)-\d{3}$`
+  - Examples: `SEC-001`, `PERF-042`, `ARCH-001`, `MAINT-999`, `DOC-001`, `QA-001`, `COMP-001`
   - Action: Proceed to Phase 0 (Resolve Issue by ID)
 
 - **Legacy Paste Mode:** If `$ARGUMENTS` does not match the ID pattern (e.g., contains `### [` or other issue block content)
@@ -43,7 +43,7 @@ $ARGUMENTS
 The target directory depends on the issue's prefix:
 
 - `QA` → `docs/testing/reports/`
-- `SEC`, `PERF`, `ARCH`, `MAINT`, `DOC` → `docs/reviews/`
+- `SEC`, `PERF`, `ARCH`, `MAINT`, `DOC`, `COMP` → `docs/reviews/`
 
 Extract the prefix from `$ARGUMENTS` (the substring before the first `-`) and list the newest `.md` file in the chosen directory:
 
@@ -94,6 +94,18 @@ Once found, extract the complete issue block:
 - **End:** the next `###` heading, or `---` separator, or end of file
 
 This extracted block becomes the input for Phase 1.
+
+**A composite by ID.** When the block carries `**Category:** Composite` and a `**Composed-of:**` line, also extract every component block named in `Composed-of` that exists in the same report — already-fixed and rejected ones included, each with its `**Status:**` line — and assemble the payload: the composite block first, then each component block in `Composed-of` order, every block passed through the dispatch-copy rule of `code-review:decision-gate` stage 3 (loop-written lines stripped; `Location` and any pre-existing `Status` travel). A component whose `Location` is not usable under *The usability rule* in `code-review:decision-gate` **in full** — it parses by the two-clause read rule, is contained in the repository tree by that section's three-step containment test, and exists there — still travels in the payload for the description it carries, but is never opened: Phase 2's Step 2.1b skips it and Phase 5 records it `unresolved (no location)`. An ID in `Composed-of` with no block in the report at all makes the composite malformed: report `Composite {ID} is malformed — {absent ID} has no block in the report; repair Composed-of or dissolve the composite by hand` and stop before Phase 1. Test that before the count below, as rules 1–2 of Step 1.6.1 in `fix-all.md` do, so a composite that is both malformed and degenerate discloses the absent ID under either command. Fewer than two **unfixed** components → the composite is degenerate: report `Composite {ID} is degenerate — fix {remaining ID} directly with /fix {remaining ID}` (or, with none left, `Composite {ID} has no open components`) and stop. A composite that survives both tests is **dispatchable** in the sense Step 1.6 of `fix-all.md` defines — open, not degenerate and not malformed. `/fix` runs the composite itself, never through `fix-auto`: Phases 1–8 below carry composite mode where they say so.
+
+### Step 0.4.5: A component of an open composite
+
+If the block extracted in Step 0.4 is **not** a composite and carries no `**Status:**` line, scan the report for an **open** composite (no `**Status:**` line) whose `Composed-of` names this ID, and apply Step 0.4's malformed and degenerate tests to it. A composite that survives both — **dispatchable** in the sense Step 1.6 of `fix-all.md` defines — is offered below; a degenerate or malformed one is not: proceed to Step 0.5 and fix `{ID}` as an ordinary finding. If one exists, ask with AskUserQuestion, question `{ID} is part of composite {COMP-ID}. Fix which?`, three options:
+
+- label `Fix {COMP-ID} (recommended)`, description `{composite title} — one root-cause change resolving {every component ID}`;
+- label `Fix {ID} alone`, description `Local fix only — the shared cause stays and {COMP-ID} returns whole on the next bulk run`;
+- label `Abort`, description `Stop now without modifying any files`.
+
+`Fix {COMP-ID}` re-enters Step 0.4 with the composite's ID. `Fix {ID} alone` proceeds as today: its `Fixed` does not touch the composite, and the degeneracy rule applies on the next bulk run. `Abort` prints `Aborted. No changes made.` and stops.
 
 ### Step 0.5: Handle not found
 
@@ -154,8 +166,8 @@ Extract the following fields from the issue block:
 |-------|---------|----------|
 | Severity | `[CRITICAL\|HIGH\|MEDIUM\|LOW]` in title | Yes |
 | Title | Text after severity in first line | Yes |
-| Location | `**Location:** \`path:line\`` (plain form) or `` **Location:** `path:line` (was: `original`) `` (extended form, written by the decision-gate loop when it corrects a location) | Yes |
-| Category | `**Category:** Security\|Performance\|Architecture\|Maintainability\|Documentation\|Testing` | Yes |
+| Location | `**Location:** \`path:line\`` (plain form) or `` **Location:** `path:line` (was: `original`) `` (extended form, written by the decision-gate loop when it corrects a location) | Yes (the composite block, in composite mode) |
+| Category | `**Category:** Security\|Performance\|Architecture\|Maintainability\|Documentation\|Testing\|Composite` | Yes |
 | OWASP | `**OWASP:** A##:####` | No |
 | CWE | `**CWE:** CWE-###` | No |
 | Effort | `**Effort:** trivial\|easy\|medium\|hard` | No |
@@ -163,6 +175,8 @@ Extract the following fields from the issue block:
 | Impact | Text after `**Impact:**` | No |
 | Remediation | Text after `**Remediation:**` (including code blocks) | Yes |
 | Source | Text after `**Source:**` (reviewer handle + PR comment URL) | No — presence signals untrusted provenance (see Step 0.7) |
+| Composed-of | `**Composed-of:** ID, ID[, ID…]` — one physical line of bare `PREFIX-NNN` tokens | Yes, in composite mode |
+| Origin | `**Origin:** review\|fix-time` | No |
 
 **If required fields are missing:**
 
@@ -182,6 +196,8 @@ The `**Location:**` field exists, so the "required fields missing" branch above 
 
 Wait for the reply and substitute it into the parsed Location before Phase 2. If the user cannot supply one, stop and report the issue as **Failed** (no location to fix) rather than opening a file named `—`.
 
+**Composite mode.** When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode; a `Composite` block without one is a **Failed** verdict naming the missing field. Parse `**Composed-of:**`, then each following `###` block as a **component** with this same table; each block's capture ends at the next `###` heading, and exactly one `User decision:` field is parsed — the line immediately after the composite block. Every ID in `Composed-of` must have a block in the input: an ID with no block at all is a **Failed** verdict naming it, and you never fetch a component from the report on disk (Step 0.4 already did). A component block carrying a `**Status:**` line is skipped and listed — `skipped (fixed)` for `✅ Fixed` or `⚠️ Partially Fixed`, `skipped (rejected)` for `🚫 Rejected`. A component without a usable `Location` is kept and its symptom check in Phase 5 records `unresolved (no location)`. In legacy paste mode a composite block pasted without its component blocks fails here with that same missing-block error and the message `paste the components too, or run /fix {COMP-ID}`. The required-field and location-less branches above apply to the composite block only: a component is never asked for — a component missing a usable `Location` is kept and recorded `unresolved (no location)` in Phase 5, and a component missing any other field is still parsed as context for the composite's fix.
+
 **Store parsed data mentally for next phases.**
 
 **Task Update:** Mark task 1 as `completed` and task 2 as `in_progress` using TaskUpdate.
@@ -197,6 +213,10 @@ Use Read tool to read the file at the parsed Location. Focus on:
 - The specific line(s) mentioned in the issue
 - The function/method/class containing the issue
 - 20-30 lines of surrounding context
+
+**Step 2.1b: Composite mode — read every component first**
+
+In composite mode, before anything else in this phase, read the composite's `Location` and then every component's `Location` with 20–30 lines of context (a component whose `Location` is not usable under *The usability rule* in `code-review:decision-gate` **in full**, its containment test included, is noted and skipped — never opened). The root-cause change is designed against the symptoms as they stand in the tree, never against their descriptions alone: a fix planned without reading the symptoms is exactly the local-patch failure this mode exists to prevent.
 
 **Step 2.2: Understand the code structure**
 
@@ -257,6 +277,8 @@ Present the fix proposal in this exact format:
 **Approach:**
 [2-3 sentences explaining the fix strategy, incorporating the Remediation
 suggestion from the issue and adapting it to the actual code context]
+
+**Components to resolve:** [composite mode only — each component ID and title the single change must leave without its symptom; a component's own Remediation is context, never part of the approach]
 
 **Changes:**
 1. [Specific change #1]
@@ -333,6 +355,10 @@ When implementing the fix, follow conventions from loaded developer skills:
 - If Tailwind: cn() utility, semantic tokens, mobile-first
 
 **Only apply patterns from skills that were actually detected. Do not force patterns from undetected frameworks.**
+
+**Step 4.1c: Composite mode — the composite's Remediation and nothing else**
+
+*In composite mode you implement the composite's Remediation. A component's Remediation is context for understanding its symptom; it is never applied, in this phase or in Phase 6's iterations. A component the root-cause change does not cover is reported unresolved in Phase 7, not patched locally.*
 
 **Step 4.2: Handle multiple locations**
 
@@ -415,6 +441,10 @@ Track each tool's result:
 - Pass/Fail status
 - Error details if failed
 
+### Step 5.4: Composite mode — tool union and per-component symptom check
+
+Tool selection in composite mode is the **union** of the Step 5.1 rows matched by every component plus the rows matched by the composite's own change. After the tools, for each component not skipped in Phase 1, re-read its `Location` with 20–30 lines of context and decide whether its `Problem` still holds; record `resolved` or `unresolved` with one line of evidence, `unresolved (no location)` where it has no usable location. A skipped component is not checked and keeps its Phase 1 Result.
+
 ---
 
 ## Phase 6: Auto-Iterate on Failures
@@ -486,6 +516,12 @@ Present the final report in this exact format:
 | [tool1] | [ICON] [Pass/Fail] | [brief details] |
 | [tool2] | [ICON] [Pass/Fail] | [brief details] |
 
+**Components:** [composite mode only]
+| ID | Result | Evidence |
+|----|--------|----------|
+| [SEC-002] | [resolved] | [validation now runs in `middleware.py:14` before the handler] |
+| [ARCH-001] | [unresolved] | [handler still constructs the query inline at `handler.py:88`] |
+
 **Iterations:** [N] of 3 [if more than 1]
 
 **Remaining Issues:** [if any]
@@ -502,6 +538,8 @@ Present the final report in this exact format:
 | Fixed | ✅ | All verification passed |
 | Partially Fixed | ⚠️ | Main issue fixed, minor issues remain |
 | Failed | ❌ | Could not fix within 3 iterations |
+
+**Composite mode verdict.** `Result` ∈ `resolved`, `unresolved`, `unresolved (no location)`, `skipped (fixed)`, `skipped (rejected)`. The verdict is computed over the components actually checked — `unresolved (no location)` and the skipped values are excluded and disclosed instead: **Fixed** when every checked component is `resolved` and verification passed; **Partially Fixed** when at least one checked component is `resolved`; **Failed** otherwise, or when the change could not be applied. When no component was checked at all — every component skipped or without a usable `Location` — the verdict is **Failed**, disclosed as `no component checked`, never Fixed by vacuous truth.
 
 ### Next Steps by Status
 
@@ -581,11 +619,16 @@ If status is **Partially Fixed**, follow the same process as Step 8.2 but insert
 
 If status is **Failed**, do NOT modify the report. The issue remains unfixed and will appear again on the next `/fix-report` run.
 
+### Step 8.4.5: Composite mode — propagate to components
+
+Map by the fixer verdict: **Fixed** → `✅ Fixed` on the composite and on each `resolved` component; **Partially Fixed** → `⚠️ Partially Fixed` on the composite and `✅ Fixed` on each `resolved` component, no status on the others (released; they return individually on the next bulk run); **Failed** → no status anywhere. Each component's line is inserted after that component's own `### [SEVERITY] {ID}: Title` heading by Step 8.2's recipe — the same `old_string`/`new_string` insert, once per block written. A component skipped in Phase 1 keeps the status it already carried and is never written to. Each `**Status:**` line written here — the composite's own included — is written together with a `**Verification:** advisory — <checks run>` line, in the form `code-review:decision-gate`'s stage 4 writes it, because the component result rests on your own re-read. Step 8.1.5 applies to every block written: never a second `**Status:**` line.
+
 ### Step 8.5: Confirm update
 
 After editing the report, display:
 
 > Issue `{ID}` marked as {Status} in report: `{report-path}`
+> (composite mode: also `{component ID}` → {status} for each component written)
 
 **Task Update:** Mark task 7 as `completed` using TaskUpdate.
 

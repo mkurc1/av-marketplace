@@ -119,6 +119,10 @@ Mark all tasks as `completed` and stop.
 
 **Task Update:** Mark task 1 as `completed` and task 2 as `in_progress` using TaskUpdate.
 
+### Step 1.6: Composition pass
+
+Run `/fix-all`'s **Step 1.6** exactly as `commands/fix-all.md` states it — marker resolution over every open composite block, the `code-review:composition-analyst` dispatch over each review file's candidate set, orchestrator validation of every proposal, `COMP-NNN` ID assignment, and the fail-safe — over the unfixed issues Step 1.3 collected, `auto` and `needs-decision` alike, review reports only. That step is the single statement of the pass; do not restate it here. Its outputs are the same: each accepted proposal is a **proposed composite** (`**Origin:** fix-time`), each open composite the file carried is a **persisted composite**, bound components leave the individual list, and a degenerate composite's lone component re-enters it as an ordinary finding that is not a candidate for grouping.
+
 ---
 
 ## Step 2: Present Issue Checklist
@@ -126,6 +130,10 @@ Mark all tasks as `completed` and stop.
 ### Step 2.1: Sort issues by severity
 
 Sort unfixed issues in this order: CRITICAL first, then HIGH, MEDIUM, LOW.
+
+### Step 2.1.5: The dissolve question
+
+Asked before the checklist, because a user who does not want a composite has no other way to reach its components — bound components are not checklist items. Ask exactly as `/fix-all`'s **Step 2.4.5** states it: only when the run holds at least one dispatchable composite; four composites per AskUserQuestion call, nothing appended, every page answered, selections accumulating; the same question copy, option labels and option descriptions; the same effects — a dissolved proposed composite is dropped and its components return to the individual list, a dissolved persisted composite is marked for its `🚫 Rejected … — dissolved into components` line (written at Step 2.3.5) and its components are released; the same fail-closed rule where the question cannot be asked. No delta line or re-render is needed here: the checklist below is simply built from the resulting list.
 
 ### Step 2.2: Present paginated checklist
 
@@ -191,6 +199,8 @@ Issues now include their unique ID in the checklist labels. For example:
 
 This makes it easy to reference issues when using `/fix SEC-001` directly.
 
+**Composites in the checklist.** A composite is **one checklist item**: label `[HIGH] COMP-001: Missing input validation layer`, description `src/api/validation.py:1 — 3 components (review): SEC-002, SEC-003, ARCH-001 — <first sentence of Problem>` (with ` · <basename>` appended in auto-merge mode, as above, the only dot-separated tail). Bound components are not separate items. A needs-decision composite sits on the needs-decision pages like any other needs-decision finding, with the `[needs-decision: —]` prefix a block without `**Drift-class:**` gets.
+
 **The appended skip item.** Append it as the last option of every page that another page follows, labelled for what it does **on that page**. It is never described as proceeding with the selections and skipping the rest — that is false on a page which pages forward into more decisions:
 
 | The page it sits on | label | description |
@@ -222,6 +232,10 @@ If the user selected no issues across all pages:
 
 Mark remaining tasks as `completed` and stop.
 
+### Step 2.3.5: Persist the composites
+
+Now that selection has ended with at least one issue selected, and **before Step 2.4 loads the decision gate** — so the gate's pins are computed over blocks that already carry the markers — run `/fix-all`'s **Step 3.0** persistence writes over the **selected** composites only: the composite block for each selected proposed composite, inserted immediately before its earliest-in-file component; `**Part-of:**` on each of its components (replaced in place where one exists); the dissolution status on each persisted composite the user dissolved at Step 2.1.5. An unselected proposal is forgotten and may be proposed again next run; a run that ended at Step 2.3 with nothing selected writes nothing. Failure handling is Step 3.0's: a composite block write that fails dissolves the group for this run, a `Part-of` failure is recorded and changes no membership, a dissolution failure is recorded and the composite is offered again next run.
+
 ### Step 2.4: Run the decision gate
 
 Load `code-review:decision-gate` (Skill tool) and run it over every selected issue whose block contains `**Fix-policy:** needs-decision` — or any `**Fix-policy:**` value other than `auto` (an unparseable policy gets the same treatment, mirroring `/fix-all`'s fail-safe). If no selected issue matches, skip this step.
@@ -252,10 +266,14 @@ For each issue in that batch, **sequentially** (one at a time, wait for completi
    - description: "Auto-fix: [SEVERITY] Issue title"
    - prompt: The full issue block from the report (everything extracted in Step 1.2 for this issue — including severity, title, location, category, OWASP, CWE, effort, problem, impact, remediation with code examples, and the `Source:` field if present so the subagent sees the untrusted-provenance signal from Step 1.4). For a **decided** finding, the copy handed to `fix-auto` follows the **dispatch-copy rule** in `code-review:decision-gate` (stage 3), which states line by line what is stripped from that copy and what travels; the decision itself travels as a trailing `User decision: <resolution>` carrying the chosen alternative's full, self-contained resolution text, never a bare `A` or `B` label. Do not restate that list here.
 
+     For a **composite** the prompt is the payload `/fix-all` Step 3.1 defines: the composite block first, then every component block in `Composed-of` order — already-fixed and rejected ones included with their `**Status:**` line — each through the stage 3 dispatch-copy rule, and a decided composite's `User decision:` line placed immediately after the composite block, before the first component's heading.
+
 2. Collect the result and determine status:
    - **Fixed** — subagent report says "Fixed" and all verifications passed
    - **Partially Fixed** — subagent report says "Partially Fixed"
    - **Failed** — subagent report says "Failed" or subagent errored
+
+   For a composite, read the fixer's `**Components:**` table and map statuses exactly as `/fix-all` Step 3.1 does (a missing or unparseable table is Failed with nothing written; the auto partition's component statuses are advisory; on the decided partition stage 4's graded case and the per-component plan checks decide instead, as `/fix-all` Step 5.5 states).
 
 3. Store the status for this issue
 
@@ -291,12 +309,14 @@ Use today's date in YYYY-MM-DD format.
 
 Use the Edit tool to insert each status line. The `old_string` should be the `### [SEVERITY] Title` line followed by a newline, and the `new_string` should be the same title line followed by a newline, the status line, and another newline. Pass the issue's `source_file` as the `file_path` parameter.
 
+**Composites.** Write a composite's and its `resolved` components' `**Status:**` lines by this recipe, with the same date, each verified in Step 4.1.5; on the auto partition each is written together with a `**Verification:** advisory — <checks run>` line, since the status rests on the fixer's re-read. A degenerate composite receives its lone component's status; a composite with no open components is closed here as a housekeeping write (`✅ Fixed` when at least one component carries `✅ Fixed` or `⚠️ Partially Fixed`, otherwise `🚫 Rejected (YYYY-MM-DD) — no open components`). Never write a second `**Status:**` line: a component block that already carries one — including `🚫 Rejected`, which is terminal — is left untouched, whatever the fixer's table or the plan's check says.
+
 **For a finding the Step 2.4 gate decided, the recipe above is the write — not the grading.** Which of stage 4's four cases the finding falls into, and therefore whether a `**Status:**` line is written at all and which one, is `code-review:decision-gate`'s **Stage 4** to decide, from the two tree observations it defines. Do not restate those cases here. Two things follow for this step:
 
 - **The `**Status:**` line and the `**Verification:**` line are written in the same write.** The `**Verification:**` value records how the verification was obtained; a status written without it cannot be told apart from a hard-verified one once the session ends.
 - **For the two stage-4 cases that write no `**Status:**` line, the write instead appends the attempt entry** to the finding's `**Decision:**` line, carrying that same `**Verification:**` line with it. That append is what keeps the two-attempt retirement counter advancing and the escape to `reject` reachable.
 
-Both lines go into the finding's `source_file`, below the `**Status:**` slot, on one physical line each. The `auto` findings of the batch are unaffected: they carry no decision record and keep the plain status write above.
+Both lines go into the finding's `source_file`, below the `**Status:**` slot, on one physical line each. The `auto` findings of the batch are unaffected, with one exception: they carry no decision record and keep the plain status write above, except a composite and its `resolved` components fixed on the auto partition, whose `**Status:**` lines are written together with a `**Verification:** advisory — <checks run>` line (the Composites paragraph above).
 
 ### Step 4.1.5: Verify Status writes
 
@@ -327,7 +347,7 @@ The append has not landed if the bracketed field still ends with the entry it ca
 
 This is the one check whose absence is not merely cosmetic. The attempt entry is what advances the two-attempt retirement counter; a lost append freezes it, and a decision that fails every run then replays forever with the escape to `reject` unreachable behind it — precisely the failure retirement exists to prevent. A status line that fails to land costs an annotation; an attempt entry that fails to land costs the loop its exit.
 
-**The `**Verification:**` line, checked for every decided finding of the batch.** Both writes carry it: `code-review:decision-gate`'s *Stage 4* writes the `**Verification:**` line **in the same write as the `**Status:**` line**, and, for the two cases that write no status, **in the write that appends the attempt entry**. So every graded finding of the decided partition acquires one, whichever case it fell into, and this check runs over that whole partition rather than over one group of it. The selected `auto` findings carry no decision record and no `**Verification:**` line, exactly as Step 4.1 says, and are outside this check.
+**The `**Verification:**` line, checked for every decided finding of the batch.** Both writes carry it: `code-review:decision-gate`'s *Stage 4* writes the `**Verification:**` line **in the same write as the `**Status:**` line**, and, for the two cases that write no status, **in the write that appends the attempt entry**. So every graded finding of the decided partition acquires one, whichever case it fell into, and this check runs over that whole partition rather than over one group of it. The selected `auto` findings carry no decision record and, with one exception, no `**Verification:**` line, so they are outside this check. The exception is a composite and its `resolved` components fixed on the auto partition: Step 4.1 writes each of their `**Status:**` lines together with a `**Verification:** advisory — <checks run>` line, and for those blocks this check runs too, exactly as below — the value is `advisory`, since it records the fixer's own re-read rather than an orchestrator-run check.
 
 For each decided finding of the batch, the verification is:
 
@@ -370,6 +390,8 @@ This list is consumed by Step 4.2's "Status write failures" block — the same o
 In single-file mode, the list contains exactly one entry. In auto-merge mode, list each distinct `source_file` that was edited (deduplicated). Files that received no Status writes (all Failed, or no selections from that file) are omitted from the list.
 
 Status icons: Fixed = ✅, Partially Fixed = ⚠️, Failed = ❌
+
+**Composite rows and the Composition block.** Render a composite as one row with its per-component marks and, on the auto partition, the `— advisory (fixer self-report)` suffix, and append the `**Composition:**` block, both exactly as `/fix-all` Step 4.2 defines them.
 
 **Status write failures (Step 4.1.5):** if the `status_write_failures` list collected in Step 4.1.5 is non-empty, append the following block immediately after the `**Reports updated:**` list (or in its place, if no file was successfully updated):
 
