@@ -185,6 +185,35 @@ Follow the [Abort helper](#abort-helper) procedure.
 
 **Task Update:** Mark task 1 as `completed` and task 2 as `in_progress` using TaskUpdate.
 
+### Step 1.6: Composition pass
+
+Runs over every unfixed issue from Step 1.3, `auto` and `needs-decision` alike, **per source file, and only for review reports** (`docs/reviews/`, feedback reports included). A QA report under `docs/testing/reports/` is never grouped: the `COMP` prefix routes to `docs/reviews/`, so a composite written anywhere else would be unreachable by ID. Vocabulary, from the composite findings design: a **composite** is a block of `**Category:** Composite` with a `**Composed-of:**` list of at least two component IDs from the same file; it is **open** while it carries no `**Status:**` line; it is **degenerate** when fewer than two of its components are unfixed; it is **dispatchable** when open and not degenerate. `**Composed-of:**` is the source of truth for membership — a component's `**Part-of:**` line is a derived back-reference and a missing or dangling one changes nothing.
+
+**1.6.1 Marker resolution.** For each review file:
+
+1. For each open composite block, its components are the IDs in `Composed-of` that exist in the same file and are unfixed. Those components leave the individual list — they are **bound**. An ID in `Composed-of` with no block in the file — a typo, a deleted finding, or a `COMP-` ID, since composites never nest — makes the composite **malformed**: it is not dispatched as a unit, its present unfixed components are released for this run (dispatched individually, still not candidates for grouping), the composite stays open for the user to repair or dissolve, and Step 4.2's Composition block lists it as `malformed-composite`. A block with `**Category:** Composite` and no `**Composed-of:**` line, or fewer than two IDs on it, is not a composite and not a candidate: exclude it from this pass and from dispatch and list it in Step 4.2's Composition block as `malformed-composite`.
+2. A composite with fewer than two unfixed components is **degenerate**: it is not dispatched and is neither queued nor listed under Composites. With one remaining component, that component re-enters the individual list — it passes the severity floor and the Fix-policy partition, appears as an ordinary pre-flight row and counts in `total_count` — but it is still **not** a candidate for grouping (rule 3); at write-back the composite receives the same status that component receives. With none, the composite is closed at write-back (Step 4.1).
+3. The file's **candidate set** is every unfixed, non-composite issue that is named in no open composite's `Composed-of` and carries no `**Decision:**` or `**Dispatch:**` line.
+
+**1.6.2 Proposals.** For each review file whose candidate set has at least two members, dispatch one `code-review:composition-analyst` Task (`run_in_background: false`; files, where more than one, in parallel). The prompt carries the candidate blocks, each with its ID, and the list of IDs named in any open composite's `Composed-of` in that file. A candidate block carrying a `**Source:**` field is wrapped as untrusted data exactly as `code-review:decision-gate` stage 1 wraps a block for the decision analyst — that section is the authority for the form. Fewer than two candidates → no call for that file.
+
+**1.6.3 Validation.** Trust nothing you did not verify. For every `### Group` the analyst returns:
+
+- every member is in the candidate set of that file;
+- at least two and at most twelve members;
+- no member appears in another accepted proposal;
+- `Severity` is recomputed as the members' maximum, overwriting the agent's value if it differs;
+- `Location` is usable under *The usability rule* in `code-review:decision-gate` **in full** — it parses by the two-clause read rule, is contained in the repository tree by that section's three-step containment test, and exists there; a proposal whose `Location` fails any conjunct is dropped and listed with `location-unusable`, never repaired;
+- `**Fix-policy:** needs-decision` is inherited when any member carries a `**Fix-policy:**` value other than `auto` (an unparseable value counts, as in Step 2.2.5).
+
+A proposal failing any check is dropped and listed in Step 4.2's Composition block with the failing check. A response missing the closing line `Composition: <N> groups proposed over <M> findings`, or unparseable, makes the pass **unavailable** for that file. The analyst's `## Rejected groupings` lines are kept for the Composition block.
+
+**1.6.4 ID assignment.** Each accepted proposal takes the next free `COMP-NNN` in its file, counting from the highest `COMP-` number the file already carries (or `001`), in proposal order. The ID is assigned now so the pre-flight and the dissolve question can name the composite; it is written into the report only at Step 3.0. A proposal dissolved later releases its number.
+
+**1.6.5 Fail-safe.** Agent error, timeout (the platform's own — the pass carries no wall-clock budget of its own), or an unavailable pass yields zero proposals for that file; the pre-flight carries `Composition pass: unavailable — <reason>` and the run proceeds per finding, exactly as today. Grouping never blocks fixing.
+
+Each accepted proposal is, from here on, a **proposed composite** with `**Origin:** fix-time`; each open composite the file carried is a **persisted composite**. Both go through Steps 2.2–2.5 as one issue each, with the composite's severity and Fix-policy; their bound components are excluded from the fix list.
+
 ---
 
 ## Step 2: Filter and Pre-flight Summary
@@ -274,6 +303,22 @@ Render to stdout (Markdown):
 ...
 ~~~
 
+**Composites block.** When the run holds at least one dispatchable composite, or the pass was unavailable, render under the table:
+
+```markdown
+**Composites:**
+- COMP-001 (review) — Missing input validation layer — components: SEC-002, SEC-003, ARCH-001
+  Problem: <the composite's Problem>
+  Remediation: <the composite's Remediation>
+- COMP-002 (fix-time, proposed) — Unbounded queue growth — components: PERF-001, PERF-003
+  Problem: <…>
+  Remediation: <…>
+
+**Composition pass:** 1 proposed this run, 1 already in the report
+```
+
+`proposed this run` counts the pass's accepted proposals — none of which is persisted at this point — and `already in the report` counts the open composite blocks the file carries, whatever their `Origin`. The line reads `unavailable — <reason>` where Step 1.6.5 applied, and `0 proposed this run, 0 already in the report` prints as `none`. Where Step 2.4.5's fail-closed path applied, a second line follows: `Dissolve question: unavailable — <reason>; all composites dissolved for this run`. The `Problem` and `Remediation` lines go one step beyond §6.6's minimum, deliberately: the dissolve question is the one human gate on a grouping, and with them on screen the user vetoes the change itself, not a list of IDs.
+
 Rendering rules:
 
 - Omit the `Severity floor:` line entirely if `severity_floor` is unset.
@@ -282,6 +327,23 @@ Rendering rules:
 - Truncate titles longer than 60 characters to 60 chars + `…`.
 - **Always render the full list** — no "and N more" truncation.
 - `Location` is read from the issue's `**Location:**` field by the **two-clause read rule** in `code-review:decision-gate` (*The usability rule*), which is that rule's single source of truth and is not restated here. Render the location the rule yields — the first backticked token, never the whole field value with its `(was: …)` tail — and `—` where the field is missing or the rule reads it as location-less. Containment, which that same section adds as a further conjunct of *usability*, is stage 0's gate for whether to ask a human and is not applied here: this table renders, it does not validate.
+- A composite (proposed or persisted) is one row: `COMP-001`, its severity, title, location. Bound components of a dispatchable composite do **not** appear in the table, and `total_count` counts a composite as one issue and excludes its bound components.
+
+### Step 2.4.5: The dissolve question
+
+Asked **only when the run holds at least one dispatchable composite**, proposed or persisted. Use AskUserQuestion with `multiSelect: true`, four options per call, all of them composites — nothing is appended, unlike `/fix-report`'s checklist pages — so a run with Y composites costs ⌈Y/4⌉ answers; every page is answered in sequence, selections accumulate across pages, and every dispatchable composite appears on some page.
+
+- question, on the last or only page: `Dissolve which composites into their components? (select none to keep all)`; on a page another page follows: `Dissolve which composites into their components? (page X of Y — select none on this page to keep these)`;
+- option label: `[HIGH] COMP-001: Missing input validation layer` — severity, ID and title, under Step 2.4's 60-character title rule;
+- option description, persisted composite: `review · 3 components: SEC-002 <title>, SEC-003 <title>, ARCH-001 <title> — <first sentence of Problem> — marks COMP-001 🚫 Rejected in the report and releases them`; proposed composite: `fix-time, proposed · 2 components: PERF-001 <title>, PERF-003 <title> — <first sentence of Problem> — drops the proposal, nothing is written`.
+
+**Effects of dissolving.** A **proposed** composite is dropped: nothing is written, its number is released, and its components return to the individual list. A **persisted** composite is marked for a `**Status:** 🚫 Rejected (YYYY-MM-DD) — dissolved into components` line on its block, written at Step 3.0; that status releases its components (a released component without a status of its own is an ordinary unfixed finding). Released components pass through Step 2.2's severity floor and Step 2.2.5's Fix-policy partition again.
+
+Then print one line per dissolved composite, naming the released components and where each went — `Dissolved COMP-002: 2 components released — 1 joins the fix list, 1 requires a decision, 0 below the severity floor; total to fix 13` — followed by a re-render of the affected part of the pre-flight: the released components as issue-table rows (`#`, ID, severity, title, location, and the Source and Report columns where shown) with recomputed `By severity` and `Requires user decision (skipped)` lines, so the full list the gate asks about is on screen. The last line's total is the `total_count` Step 2.5's question and its `Yes — fix all <total_count>` label use.
+
+**The gate is fail-closed.** Where the question cannot be asked — AskUserQuestion unavailable, or it errors — no composite is dispatched as a unit this run: every proposed composite is dropped and nothing is persisted, and every persisted composite is treated as dissolved for the run with its components dispatched individually, no dissolution status written. The pre-flight and Step 4.2's Composition block carry `Dissolve question: unavailable — <reason>; all composites dissolved for this run`. Silence is never read as consent.
+
+This is the one human gate on a grouping. A composite that passes it is fixed as a unit.
 
 ### Step 2.5: Confirmation gate
 
@@ -308,6 +370,16 @@ Follow the [Abort helper](#abort-helper) procedure.
 
 ## Step 3: Fix All Selected Issues
 
+### Step 3.0: Persist the composites
+
+Markers are written **only now that the run has committed to dispatching** — after Step 2.5's `yes`, before the first fixer call — so an aborted run keeps `Aborted. No changes made.` true. Each write uses the `Edit` tool and is verified by re-reading the file, as Step 4.1.5 verifies status lines:
+
+1. **Composite block** for each proposed composite (`**Origin:** fix-time`), in the Review Comment Format with `**ID:**`, `**Location:**`, `**Category:** Composite`, `**Composed-of:**` (one physical line), `**Origin:**`, `**Effort:**`, `**Fix-policy:** needs-decision` where inherited, `**Problem:**`, `**Impact:**`, `**Remediation:**` — inserted immediately before the heading of the component that appears first **in the file** among its `Composed-of` members (not first in `Composed-of` order), so the block always precedes every member: `old_string` = that heading line, `new_string` = the composite block, a blank line, then the heading.
+2. **`**Part-of:** COMP-NNN`** on each component, directly after its `**ID:**` line, or after the heading where there is none. A block carries at most one `**Part-of:**` line: where one already exists, replace it in place.
+3. **Dissolution status** on each persisted composite the user dissolved in Step 2.4.5: `**Status:** 🚫 Rejected (YYYY-MM-DD) — dissolved into components`, by the Step 4.1 recipe.
+
+Failures: a composite block write that fails or does not verify dissolves the group for this run — its components are dispatched individually and Step 4.2 lists it with `marker-write-failed`; a `Part-of` write that fails is recorded there and membership is unaffected; a dissolution write that fails is recorded, the composite is treated as dissolved for this run and is offered again next run.
+
 ### Step 3.1: Sequential fix execution
 
 For each issue in the filtered + sorted list from Step 2.3, in order, **sequentially** (one at a time, wait for completion):
@@ -324,10 +396,22 @@ For each issue in the filtered + sorted list from Step 2.3, in order, **sequenti
    - description: `"Auto-fix: [<SEVERITY>] <Title>"`
    - prompt: the full issue block from the report (everything extracted in Step 1.2 for this issue — heading line through the next `###` / `---` / EOF; this includes severity, title, location, category, OWASP, CWE, effort, problem, impact, remediation with code examples, and the `**Source:**` field if present — `fix-auto`'s Phase 1 field table does not consume `**Source:**` but passing the full block keeps the input format consistent across commands).
 
+   **For a composite** the prompt is one payload: the composite block first, then each component block in `Composed-of` order, each as its own `###` section — every ID in `Composed-of` that still has a block in the file, already-fixed and rejected components included with their pre-existing `**Status:**` line — every block passed through the dispatch-copy rule of `code-review:decision-gate` stage 3 (loop-written lines stripped; `Location` and any pre-existing `Status` travel). A `User decision:` line, where present, applies to the composite and is placed immediately after the composite block, before the first component's heading — never after the last component, where the fixer's Remediation capture would take it. A composite queues where any finding queues: severity order, then source order.
+
 3. Collect the result and determine status:
    - **Fixed** — subagent report says "Fixed" and all verifications passed
    - **Partially Fixed** — subagent report says "Partially Fixed"
    - **Failed** — subagent report says "Failed" OR subagent errored (timeout, crash, malformed response)
+
+   **For a composite**, additionally read the fixer's `**Components:**` table by matching each row's `ID` against `Composed-of`; a row naming a foreign ID is ignored and noted for the Composition block. A report with no `**Components:**` table, or one that does not parse, is **Failed** and nothing is written for the composite or any component. Then map:
+
+   | Fixer verdict | Composite | Component `resolved` | Component not `resolved` |
+   |---|---|---|---|
+   | Fixed | `✅ Fixed` | `✅ Fixed` | n/a |
+   | Partially Fixed | `⚠️ Partially Fixed` | `✅ Fixed` | no status — released, returns individually next run |
+   | Failed | no status | no status | no status — the composite returns whole next run |
+
+   A component skipped by the fixer (`skipped (fixed)`, `skipped (rejected)`) keeps the status it already carried and is never written to; `unresolved (no location)` counts as not resolved. On this auto path the component columns rest on the fixer's own Components table — the agent that applied the change is also the one that judged each symptom — so those component statuses are **advisory** and are labelled so in Step 4.2.
 
 4. Store the status keyed to the issue's `source_file` and ID. Continue to the next issue regardless of outcome — **continue on failure**, never break the loop. This matches `/fix-report` Step 3.
 
@@ -358,6 +442,8 @@ For each issue with status `Fixed` or `Partially Fixed`, edit its `source_file` 
 Use today's date in `YYYY-MM-DD` format.
 
 Use the `Edit` tool with `old_string = "<heading>\n"` and `new_string = "<heading>\n**Status:** <icon> <text> (YYYY-MM-DD)\n\n"`. This recipe handles both review reports (heading immediately followed by `**Location:**` or another field) and QA reports (heading followed by a blank line before `**ID:**`) — matching the strategy documented in `commands/fix.md` Step 8.2 and used by `commands/fix-report.md` Step 4.1.
+
+**Composites.** A composite and each of its `resolved` components receive a `**Status:**` line with the same date by the recipe above, each verified in Step 4.1.5. Because those statuses rest on the fixer's re-read rather than on an orchestrator-run check, each is written together with a `**Verification:** advisory — <checks run>` line, in the form `code-review:decision-gate`'s stage 4 writes it, and Step 4.1.5 verifies that line as it does for the decision batch. A degenerate composite receives the status its lone component received. A composite with no open components is closed here as a housekeeping write — `✅ Fixed` when at least one component carries `✅ Fixed` or `⚠️ Partially Fixed`, otherwise `🚫 Rejected (YYYY-MM-DD) — no open components` — verified like any other; a run that never reaches this step leaves it open.
 
 ### Step 4.1.5: Verify Status writes
 
@@ -419,6 +505,7 @@ This list is consumed by Step 4.2's "Status write failures" block — the same o
 |---|-------|--------|
 | 1 | [SEVERITY] ID: Title — path:line | STATUS_ICON STATUS_TEXT |
 | 2 | [SEVERITY] ID: Title — path:line | STATUS_ICON STATUS_TEXT |
+| 3 | [HIGH] COMP-001: Missing input validation layer — src/api/validation.py:1 (SEC-002 ✅, SEC-003 ✅, ARCH-001 —) — advisory (fixer self-report) | ⚠️ Partially Fixed |
 
 **Fixed:** N | **Partially Fixed:** N | **Failed:** N
 
@@ -437,6 +524,25 @@ Omit the `**Requires user decision (skipped):**` block entirely when the `needs_
 In single-file mode the list contains exactly one entry. In auto-merge mode, list each distinct `source_file` that was edited (deduplicated). Files that received no Status writes (all Failed, or no selections from that file) are omitted; if no file was edited at all, omit the entire `**Reports updated:**` block.
 
 Status icons: Fixed = ✅, Partially Fixed = ⚠️, Failed = ❌.
+
+**Composite rows.** One row per composite, no rows for bound components. The parenthesised list renders each component's fixer `Result`, in `Composed-of` order: `✅` resolved · `—` unresolved · `❓` unresolved (no location) · `✔︎` skipped (fixed) · `🚫` skipped (rejected). The suffix `— advisory (fixer self-report)` marks the auto path; on the decision-gate path (Step 5) it is omitted and the marks carry stage 4's grading.
+
+**Composition block.** After `**Reports updated:**`, when the run held a composite or the pass was unavailable:
+
+```markdown
+**Composition:**
+- Proposed: 2 | Written to the report: 1 | Dropped proposals: 1 | Marked 🚫 Rejected (dissolved): COMP-004
+- Dropped by validation: SEC-004 + SEC-005 — member not a candidate
+- Rejected by the analyst: SEC-006 + SEC-007 — same file, different mechanism
+- Verification coverage: 2 of 3 components checked (ARCH-001: no location)
+- Marker write failures: COMP-003 — marker-write-failed
+- Pass unavailable: <reason>            <-- only where Step 1.6.5 applied
+- Dissolve question: unavailable — <reason>; all composites dissolved for this run   <-- only where Step 2.4.5's fail-closed path applied
+```
+
+`Written to the report` counts only the proposals this run persisted; `Dropped proposals` the proposals dissolved before persistence; `Marked 🚫 Rejected (dissolved)` lists the persisted composites whose block received the dissolution status; `Rejected by the analyst` renders the analyst's `## Rejected groupings`, one line per grouping; `Verification coverage` names each component the fixer could not check. Omit any line whose value is empty; omit the block when the run held no composite and the pass was not unavailable.
+
+**Restart safety.** Markers are on disk before the first dispatch, so an interrupted run leaves its successor the same composites: an open composite is retried whole, and a component fixed through a composite is filtered by Step 1.3 like any fixed finding.
 
 **Status write failures (Step 4.1.5):** if the `status_write_failures` list collected in Step 4.1.5 is non-empty, append the following block immediately after the `**Reports updated:**` list (or in its place, if no file was successfully updated):
 
@@ -472,6 +578,7 @@ Step 4 finished everything the report said could be fixed without you. This step
 
 1. Mark tasks 3 and 4 as `completed` using TaskUpdate. They never ran, and no abort helper closed them; on this path Step 5 owns their rows as well as its own. Doing it here rather than at the end means no row dangles even if the answer is "no".
 2. Print the "Requires user decision" list yourself, in the rendering Step 4.2 gives it — `- [SEVERITY] ID: Title — Drift-class: <class>`, with `—` where the `**Drift-class:**` field is missing. Step 4.2 never ran on this path, so without this the offer would be a question about findings you were never shown.
+3. **Run the composite gate here.** Step 2.4.5 and Step 3.0 were skipped with the rest of Step 2 and Steps 3–4, but Step 1.6 ran and its proposals exist, every one of them needs-decision. Print Step 2.4's Composites block, ask Step 2.4.5's dissolve question (fail-closed as there), and — only once the user answers **yes** to the offer below — run Step 3.0's persistence writes before `code-review:decision-gate` is loaded at Step 5.4, so the gate's pins are computed over blocks that already carry the markers. A **no** writes nothing. The run's commitment point on this path is that `yes`.
 
 **On the normal path** both are already done — Step 4.2 printed that list and closed task 4 — so only mark task 5 as `in_progress` using TaskUpdate.
 
@@ -507,6 +614,8 @@ That skill is the single source of truth for the decision stage — how a missin
 ### Step 5.5: Write back and verify
 
 Re-run the **Step 4.1 / 4.1.5** write-and-verify procedure over the decision batch — the same insert-after-heading `Edit` recipe and the same positional re-read, unchanged. Steps 4.1 / 4.1.5 have already run and closed task 4 by the time this step is reached — or, on the zero-auto path, never ran at all and Step 5.2 closed task 4 in their place. Either way **Step 5 owns the write-back for its own findings**: no later step will make it.
+
+**Composites in the decision batch.** A composite went through the gate as one finding; its component statuses on this path are decided by stage 4's graded case and the per-component checks in its `**Verification-plan:**` (see `code-review:decision-gate` *Stage 4*), never by the fixer's Components table — write them in this same pass by Step 4.1's recipe, without the `advisory` marker Step 4.2 gives the auto path.
 
 That recipe is this step's; **what it writes is not**. Which of stage 4's four cases a finding falls into — and therefore whether a `**Status:**` line is written at all, and which one — is graded by `code-review:decision-gate`'s **Stage 4**, from the two tree observations it defines. Do not restate those cases here.
 

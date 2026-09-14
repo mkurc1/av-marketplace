@@ -128,6 +128,32 @@ class CompositeContract(unittest.TestCase):
         self.assertIn("**Part-of:**", text)
         self.assertIn("Disjointness", text)
 
+    # ---- Task 5: /fix-all ------------------------------------------------
+
+    def test_fix_all_has_composition_steps(self):
+        # mutation: delete Step 1.6, Step 2.4.5 or Step 3.0 from fix-all.md
+        text = read(FIX_ALL)
+        for heading in ("### Step 1.6: Composition pass", "### Step 2.4.5: The dissolve question", "### Step 3.0: Persist the composites"):
+            self.assertIn(heading, text, f"{heading} missing")
+
+    def test_fix_all_dissolve_question_copy(self):
+        # mutation: delete the question string "Dissolve which composites into their components?" from fix-all.md
+        self.assertIn("Dissolve which composites into their components?", read(FIX_ALL))
+
+    def test_fix_all_fail_closed_gate(self):
+        # mutation: delete "Dissolve question: unavailable" from fix-all.md
+        self.assertIn("Dissolve question: unavailable", read(FIX_ALL))
+
+    def test_fix_all_zero_auto_hook(self):
+        # mutation: delete the Step 5.2 zero-auto paragraph that runs the dissolve question and persistence "before `code-review:decision-gate` is loaded" from fix-all.md
+        self.assertIn("before `code-review:decision-gate` is loaded", read(FIX_ALL))
+
+    def test_fix_all_composition_summary_block(self):
+        # mutation: delete the `**Composition:**` block from fix-all.md Step 4.2
+        text = read(FIX_ALL)
+        self.assertIn("**Composition:**", text)
+        self.assertIn("Verification coverage", text)
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)
