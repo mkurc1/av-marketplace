@@ -12,14 +12,12 @@ This plugin does not shorten or dumb down the message. It changes its **shape**:
 
 ## How It Works
 
-The plugin has one skill and one hook.
-
 | Component | Purpose |
 |-----------|---------|
 | `simple-language` skill | The rules: reply shape, sentence rules, words, lists, emphasis, documents |
 | `SessionStart` hook | Injects the rules into the session context at startup |
 
-The hook runs every time a session starts, resumes, is cleared, or is compacted. From the first reply, the agent follows the rules without being asked. The rules survive context compaction, because the hook re-injects them. No command to run. No configuration.
+The hook runs every time a session starts, resumes, is cleared, or is compacted. From the first reply, the agent follows the rules without being asked. The rules survive context compaction, because the hook re-injects them.
 
 ## What Changes
 
@@ -64,11 +62,3 @@ After:
 > - Forced sells still go through
 >
 > Tests: **4864** green, coverage 92.18%.
-
-## Language
-
-The skill is written in English. The agent applies the rules in whatever language the user writes in.
-
-## Disabling
-
-The plugin has no settings. To return to default writing, disable it in the `/plugin` menu under Installed plugins.

@@ -13,7 +13,7 @@ This skill governs the **shape** of prose: order of information, sentence length
 
 Prose means sentences, lists, headings, and emphasis. Code blocks, commands, quoted text, error output, and log lines are not prose and stay verbatim.
 
-Replies are in the user's language. Documents are in the language the user asks for. The rules hold in every language.
+Replies are in the user's language. Documents are in the language the user asks for.
 
 ## Reply Shape
 
