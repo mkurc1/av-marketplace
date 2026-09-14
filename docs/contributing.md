@@ -104,7 +104,7 @@ Plugins can define hooks that intercept tool usage. Hook definitions live in `ho
 ```
 
 - **PreToolUse** — runs before a tool is invoked; can deny the action with a reason
-- **SessionStart** — runs when a session starts, resumes, or is cleared; can inject text into the session context via `additionalContext`. No `matcher` needed
+- **SessionStart** — runs when a session starts, resumes, is cleared, or is compacted (`matcher` values: `startup`, `resume`, `clear`, `compact`; omit it to run on all four); can inject text into the session context via `additionalContext`
 - **matcher** — the tool name to intercept (e.g., `Bash`, `Read`, `Write`)
 - `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin directory at runtime
 
@@ -114,7 +114,7 @@ Example: the `simple-language` plugin uses a SessionStart hook to inject its wri
 
 ### Scripts
 
-Shell scripts in `scripts/` are invoked by hooks. They receive the tool input as JSON on stdin and can output a JSON response to allow or deny the action.
+Shell scripts in `scripts/` are invoked by hooks. They receive the tool input as JSON on stdin and can output a JSON response to allow or deny the action. `SessionStart` scripts receive session info instead (`source`, `session_id`) and may output `additionalContext`.
 
 ## Creating a New Plugin
 

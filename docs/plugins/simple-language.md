@@ -19,7 +19,7 @@ The plugin has one skill and one hook.
 | `simple-language` skill | The rules: reply shape, sentence rules, words, lists, emphasis, documents |
 | `SessionStart` hook | Injects the rules into the session context at startup |
 
-The hook runs every time a session starts, resumes, or is cleared. From the first reply, the agent follows the rules without being asked. No command to run. No configuration.
+The hook runs every time a session starts, resumes, is cleared, or is compacted. From the first reply, the agent follows the rules without being asked. The rules survive context compaction, because the hook re-injects them. No command to run. No configuration.
 
 ## What Changes
 
@@ -36,7 +36,8 @@ The hook runs every time a session starts, resumes, or is cleared. From the firs
 
 Plans, specs, reports, and READMEs follow the same shape:
 
-- First paragraph states the outcome, before any heading.
+- The paragraph after the title states the outcome.
+- When another skill or template fixes the section order, that order wins. The rules apply inside each section.
 - Decision first, reasons as a list below it.
 - One topic per section.
 - Terms defined once, in a table when there are more than 3.
@@ -46,7 +47,7 @@ Plans, specs, reports, and READMEs follow the same shape:
 
 - Code, commands, and file contents.
 - Quoted text, error output, and log lines.
-- Replies where the user explicitly asks for a detailed explanation or continuous prose.
+- Replies where the user asks for continuous prose: an essay, an article, a letter.
 
 ## Example
 
@@ -68,14 +69,6 @@ After:
 
 The skill is written in English. The agent applies the rules in whatever language the user writes in.
 
-## Manual Invocation
-
-The rules are already active in every session. To reload them explicitly, for example after a long conversation, ask the agent to use the `simple-language` skill.
-
 ## Disabling
 
-Disable the plugin to return to default writing:
-
-```bash
-/plugin disable simple-language
-```
+The plugin has no settings. To return to default writing, disable it in the `/plugin` menu under Installed plugins.
