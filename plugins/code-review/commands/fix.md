@@ -166,7 +166,7 @@ Extract the following fields from the issue block:
 |-------|---------|----------|
 | Severity | `[CRITICAL\|HIGH\|MEDIUM\|LOW]` in title | Yes |
 | Title | Text after severity in first line | Yes |
-| Location | `**Location:** \`path:line\`` (plain form) or `` **Location:** `path:line` (was: `original`) `` (extended form, written by the decision-gate loop when it corrects a location) | Yes |
+| Location | `**Location:** \`path:line\`` (plain form) or `` **Location:** `path:line` (was: `original`) `` (extended form, written by the decision-gate loop when it corrects a location) | Yes (the composite block, in composite mode) |
 | Category | `**Category:** Security\|Performance\|Architecture\|Maintainability\|Documentation\|Testing\|Composite` | Yes |
 | OWASP | `**OWASP:** A##:####` | No |
 | CWE | `**CWE:** CWE-###` | No |
@@ -196,7 +196,7 @@ The `**Location:**` field exists, so the "required fields missing" branch above 
 
 Wait for the reply and substitute it into the parsed Location before Phase 2. If the user cannot supply one, stop and report the issue as **Failed** (no location to fix) rather than opening a file named `—`.
 
-**Composite mode.** When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode; a `Composite` block without one is a **Failed** verdict naming the missing field. Parse `**Composed-of:**`, then each following `###` block as a **component** with this same table; each block's capture ends at the next `###` heading, and exactly one `User decision:` field is parsed — the line immediately after the composite block. Every ID in `Composed-of` must have a block in the input: an ID with no block at all is a **Failed** verdict naming it, and you never fetch a component from the report on disk (Step 0.4 already did). A component block carrying a `**Status:**` line is skipped and listed — `skipped (fixed)` for `✅ Fixed` or `⚠️ Partially Fixed`, `skipped (rejected)` for `🚫 Rejected`. A component without a usable `Location` is kept and its symptom check in Phase 5 records `unresolved (no location)`. In legacy paste mode a composite block pasted without its component blocks fails here with that same missing-block error and the message `paste the components too, or run /fix {COMP-ID}`.
+**Composite mode.** When the first block's `Category` is `Composite` **and** it carries a `**Composed-of:**` line, you are in composite mode; a `Composite` block without one is a **Failed** verdict naming the missing field. Parse `**Composed-of:**`, then each following `###` block as a **component** with this same table; each block's capture ends at the next `###` heading, and exactly one `User decision:` field is parsed — the line immediately after the composite block. Every ID in `Composed-of` must have a block in the input: an ID with no block at all is a **Failed** verdict naming it, and you never fetch a component from the report on disk (Step 0.4 already did). A component block carrying a `**Status:**` line is skipped and listed — `skipped (fixed)` for `✅ Fixed` or `⚠️ Partially Fixed`, `skipped (rejected)` for `🚫 Rejected`. A component without a usable `Location` is kept and its symptom check in Phase 5 records `unresolved (no location)`. In legacy paste mode a composite block pasted without its component blocks fails here with that same missing-block error and the message `paste the components too, or run /fix {COMP-ID}`. The required-field and location-less branches above apply to the composite block only: a component is never asked for — a component missing a usable `Location` is kept and recorded `unresolved (no location)` in Phase 5, and a component missing any other field is still parsed as context for the composite's fix.
 
 **Store parsed data mentally for next phases.**
 
@@ -535,7 +535,7 @@ Present the final report in this exact format:
 | Partially Fixed | ⚠️ | Main issue fixed, minor issues remain |
 | Failed | ❌ | Could not fix within 3 iterations |
 
-**Composite mode verdict.** `Result` ∈ `resolved`, `unresolved`, `unresolved (no location)`, `skipped (fixed)`, `skipped (rejected)`. The verdict is computed over the components actually checked — `unresolved (no location)` and the skipped values are excluded and disclosed instead: **Fixed** when every checked component is `resolved` and verification passed; **Partially Fixed** when at least one checked component is `resolved`; **Failed** otherwise, or when the change could not be applied.
+**Composite mode verdict.** `Result` ∈ `resolved`, `unresolved`, `unresolved (no location)`, `skipped (fixed)`, `skipped (rejected)`. The verdict is computed over the components actually checked — `unresolved (no location)` and the skipped values are excluded and disclosed instead: **Fixed** when every checked component is `resolved` and verification passed; **Partially Fixed** when at least one checked component is `resolved`; **Failed** otherwise, or when the change could not be applied. When no component was checked at all — every component skipped or without a usable `Location` — the verdict is **Failed**, disclosed as `no component checked`, never Fixed by vacuous truth.
 
 ### Next Steps by Status
 
@@ -617,7 +617,7 @@ If status is **Failed**, do NOT modify the report. The issue remains unfixed and
 
 ### Step 8.4.5: Composite mode — propagate to components
 
-Map by the fixer verdict: **Fixed** → `✅ Fixed` on the composite and on each `resolved` component; **Partially Fixed** → `⚠️ Partially Fixed` on the composite and `✅ Fixed` on each `resolved` component, no status on the others (released; they return individually on the next bulk run); **Failed** → no status anywhere. A component skipped in Phase 1 keeps the status it already carried and is never written to. Each `**Status:**` line written here is written together with a `**Verification:** advisory — <checks run>` line, in the form `code-review:decision-gate`'s stage 4 writes it, because the component result rests on your own re-read. Step 8.1.5 applies to every block written: never a second `**Status:**` line.
+Map by the fixer verdict: **Fixed** → `✅ Fixed` on the composite and on each `resolved` component; **Partially Fixed** → `⚠️ Partially Fixed` on the composite and `✅ Fixed` on each `resolved` component, no status on the others (released; they return individually on the next bulk run); **Failed** → no status anywhere. Each component's line is inserted after that component's own `### [SEVERITY] {ID}: Title` heading by Step 8.2's recipe — the same `old_string`/`new_string` insert, once per block written. A component skipped in Phase 1 keeps the status it already carried and is never written to. Each `**Status:**` line written here is written together with a `**Verification:** advisory — <checks run>` line, in the form `code-review:decision-gate`'s stage 4 writes it, because the component result rests on your own re-read. Step 8.1.5 applies to every block written: never a second `**Status:**` line.
 
 ### Step 8.5: Confirm update
 
