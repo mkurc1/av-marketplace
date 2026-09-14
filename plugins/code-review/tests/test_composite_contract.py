@@ -154,6 +154,22 @@ class CompositeContract(unittest.TestCase):
         self.assertIn("**Composition:**", text)
         self.assertIn("Verification coverage", text)
 
+    # ---- Task 6: /fix-report ---------------------------------------------
+
+    def test_fix_report_has_composition_steps(self):
+        # mutation: delete Step 1.6, Step 2.1.5 or Step 2.3.5 from fix-report.md
+        text = read(FIX_REPORT)
+        for heading in ("### Step 1.6: Composition pass", "### Step 2.1.5: The dissolve question", "### Step 2.3.5: Persist the composites"):
+            self.assertIn(heading, text, f"{heading} missing")
+
+    def test_fix_report_composite_checklist_item(self):
+        # mutation: delete the composite checklist item rule "A composite is **one checklist item**" from fix-report.md
+        self.assertIn("A composite is **one checklist item**", read(FIX_REPORT))
+
+    def test_fix_report_persists_before_gate(self):
+        # mutation: delete "before Step 2.4 loads the decision gate" from fix-report.md Step 2.3.5
+        self.assertIn("before Step 2.4 loads the decision gate", read(FIX_REPORT))
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]] + sys.argv[1:], verbosity=2)
