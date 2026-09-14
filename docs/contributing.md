@@ -34,7 +34,7 @@ plugins/your-plugin/
 ├── agents/                   # Specialized subagents (optional)
 ├── skills/                   # Reusable modules (optional)
 ├── hooks/                   # Tool-use hooks (optional)
-│   └── hooks.json           # Hook definitions (e.g., PreToolUse)
+│   └── hooks.json           # Hook definitions (e.g., PreToolUse, SessionStart)
 └── scripts/                 # Shell scripts used by hooks (optional)
 ```
 
@@ -104,10 +104,13 @@ Plugins can define hooks that intercept tool usage. Hook definitions live in `ho
 ```
 
 - **PreToolUse** — runs before a tool is invoked; can deny the action with a reason
+- **SessionStart** — runs when a session starts, resumes, or is cleared; can inject text into the session context via `additionalContext`. No `matcher` needed
 - **matcher** — the tool name to intercept (e.g., `Bash`, `Read`, `Write`)
 - `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin directory at runtime
 
 Example: the `commit` plugin uses a PreToolUse hook on `Bash` to block direct `git commit` commands and redirect users to the `/commit` command.
+
+Example: the `simple-language` plugin uses a SessionStart hook to inject its writing rules into every session, so the skill is active from the first reply without being invoked.
 
 ### Scripts
 
